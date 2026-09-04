@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <title>Playing — English Quest Remediation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/quiz.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="quiz-body">
+
+    <!-- Interactive Game Feedback Toast Notification -->
+    <div id="feedbackToast" class="feedback-toast" role="status" aria-live="polite">
+        <span id="feedbackIcon" class="toast-icon">✨</span>
+        <div class="toast-content">
+            <span id="feedbackTitle" class="toast-title">NICE!</span>
+            <span id="feedbackSubtitle" class="toast-subtitle">+10 XP • STREAK +1</span>
+        </div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div class="quiz-container">
+        
+        <!-- Game Top HUD -->
+        <header class="game-hud" role="banner">
+            <div class="hud-top-row">
+                <div class="hud-left">
+                    <span class="student-greeting">👋 <strong id="hudStudentName">Student</strong></span>
+                    <button type="button" id="questMapToggleBtn" class="hud-btn-map" title="View Quest Roadmap">🗺️ Map</button>
+                </div>
+
+                <div class="hud-right">
+                    <!-- Cloud Autosync Status Pill -->
+                    <div id="hudSyncStatus" class="hud-stat-pill sync-pill saved" title="Cloud Autosync Status">
+                        <span id="syncIcon">☁️</span>
+                        <span id="syncText">Saved</span>
+                    </div>
+                    <div id="hudTimer" class="hud-stat-pill timer-pill" title="Quest Challenge Timer">
+                        <span class="pill-icon">⏱️</span>
+                        <span id="timerDisplay">30:00</span>
+                    </div>
+                    <div class="hud-stat-pill score-pill" title="Earned Experience Points">
+                        <span class="pill-icon">⭐</span>
+                        <span id="xpDisplay">0</span>
+                        <span class="stat-unit">XP</span>
+                    </div>
+                    <div id="streakPill" class="hud-stat-pill streak-pill" title="Consecutive Correct Streak">
+                        <span class="pill-icon">🔥</span>
+                        <span id="streakDisplay">0</span>
+                    </div>
+                    <button type="button" id="soundToggleBtn" class="sound-toggle-btn" title="Toggle Sound (Mute/Unmute)" aria-label="Toggle Sound">🔊</button>
+                </div>
+            </div>
+
+            <!-- Task Navigation Tabs (Sections 3, 4, 5, 6) -->
+            <nav class="task-tabs-nav" id="taskTabsNav" aria-label="Task Progression Navigation">
+                <button type="button" class="task-nav-tab tab-active" id="tabTask1" data-task="1" title="Task 1: Understanding Literary Elements">
+                    <div class="tab-header-mini">
+                        <span class="tab-indicator" id="tabIcon1">●</span>
+                        <span class="tab-number">TASK 1</span>
+                    </div>
+                    <span class="tab-title">Literary Elements</span>
+                    <span class="tab-state-tag" id="tabStatus1">In Progress</span>
+                </button>
+                <button type="button" class="task-nav-tab tab-locked" id="tabTask2" data-task="2" title="Task 2: Analyzing & Evaluating Literary Text">
+                    <div class="tab-header-mini">
+                        <span class="tab-indicator" id="tabIcon2">🔒</span>
+                        <span class="tab-number">TASK 2</span>
+                    </div>
+                    <span class="tab-title">Text Analysis</span>
+                    <span class="tab-state-tag" id="tabStatus2">Locked</span>
+                </button>
+                <button type="button" class="task-nav-tab tab-locked" id="tabTask3" data-task="3" title="Task 3: Language, Style, Cohesion & Culture">
+                    <div class="tab-header-mini">
+                        <span class="tab-indicator" id="tabIcon3">🔒</span>
+                        <span class="tab-number">TASK 3</span>
+                    </div>
+                    <span class="tab-title">Language & Culture</span>
+                    <span class="tab-state-tag" id="tabStatus3">Locked</span>
+                </button>
+            </nav>
+
+            <!-- Active Task Title & Progress Bar -->
+            <div class="hud-bottom-row">
+                <div id="hudTaskBadge" class="hud-task-tag">🎯 TASK 1: Understanding Literary Elements</div>
+                <div class="hud-progress-wrap">
+                    <div class="progress-labels">
+                        <span id="hudTaskProgress">Question 1 of 10</span>
+                        <span id="hudOverallProgress" class="overall-progress-lbl">1 / 32 Questions</span>
+                    </div>
+                    <div class="hud-progress-bar-bg" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                        <div id="hudProgressBar" class="hud-progress-bar-fill"></div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Question Navigator Pill Bar -->
+        <nav class="question-nav-drawer" id="questionNavDrawer" aria-label="Question Navigation">
+            <div class="nav-drawer-label">Items:</div>
+            <div id="questionPillsContainer" class="pills-grid">
+                <!-- Dynamically rendered pills -->
+            </div>
+        </nav>
+
+        <!-- Reading Passage Card (Task 1 & Task 2) -->
+        <section id="readingPassageCard" class="reading-card hidden" aria-label="Reading Passage">
+            <div class="reading-card-header">
+                <div class="reading-header-left">
+                    <span class="reading-badge">📖 READ FIRST</span>
+                    <h3 id="readingPassageTitle" class="reading-title">Story Title</h3>
+                </div>
+                <button type="button" id="toggleReadingBtn" class="btn-toggle-reading" aria-expanded="true">
+                    <span id="toggleReadingText">Hide Passage ▴</span>
+                </button>
+            </div>
+            <div id="readingPassageCollapsible" class="reading-collapsible">
+                <p id="readingPassageInstructions" class="reading-subtext">Read the text carefully before answering:</p>
+                <div id="readingPassageContent" class="reading-passage-text"></div>
+            </div>
+        </section>
+
+        <!-- Question Board -->
+        <main id="questionCard" class="question-board" role="main">
+            <div class="question-board-header">
+                <div class="question-meta-row">
+                    <span id="questionCounterBadge" class="question-tag">QUESTION 1</span>
+                    <span class="xp-bounty-tag">⭐ +10 XP</span>
+                </div>
+                <h2 id="questionText" class="question-title">Loading question...</h2>
+            </div>
+
+            <!-- Answer Choice Cards -->
+            <div id="choicesGrid" class="choices-grid" role="radiogroup" aria-label="Answer Choices">
+                <!-- Choice buttons dynamically rendered -->
+            </div>
+
+            <!-- Quiz Action Bar -->
+            <footer class="board-footer">
+                <button type="button" id="prevQuestionBtn" class="btn-nav-prev" disabled>
+                    <span>← Previous</span>
+                </button>
+
+                <div class="footer-center-hint">
+                    <span id="selectionHintText">Tap an answer choice to auto-proceed.</span>
+                </div>
+
+                <button type="button" id="nextQuestionBtn" class="btn-nav-next">
+                    <span id="nextBtnText">Next Question →</span>
+                </button>
+            </footer>
+        </main>
+    </div>
+
+    <!-- TASK INTRO SCREEN (Overlay displayed before each Task starts) -->
+    <div id="taskIntroModal" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="modal-card task-intro-card">
+            <div id="taskIntroIcon" class="task-intro-big-icon">🎯</div>
+            <h2 id="taskIntroTitle" class="intro-title">TASK 1<br><span>UNDERSTANDING LITERARY ELEMENTS</span></h2>
+            
+            <div class="intro-focus-box">
+                <span class="focus-lbl">Academic Focus:</span>
+                <p id="taskIntroFocus" class="focus-text">Conflict • Characterization • Plot • Diction • Tone/Mood • Point of View • Narrative Techniques</p>
+            </div>
+
+            <div class="intro-metrics-row">
+                <div class="metric-col">
+                    <span class="m-val" id="taskIntroQuestionsCount">10 Questions</span>
+                    <span class="m-tag">Items</span>
+                </div>
+                <div class="metric-col">
+                    <span class="m-val" id="taskIntroXPCount">+100 XP Max</span>
+                    <span class="m-tag">Bounty</span>
+                </div>
+                <div class="metric-col">
+                    <span class="m-val" id="taskIntroPassageType">Story Text</span>
+                    <span class="m-tag">Reading</span>
+                </div>
+            </div>
+
+            <button type="button" id="startTaskBtn" class="btn-launch btn-pulsing">
+                <span id="startTaskBtnText">START TASK 1</span>
+                <span>🚀</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TASK COMPLETION MILESTONE MODAL -->
+    <div id="taskCompletionModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+        <div class="modal-card milestone-card">
+            <div class="milestone-confetti-icon">🎉</div>
+            <h2 id="milestoneHeading" class="milestone-title">TASK 1 COMPLETE!</h2>
+            <p id="milestoneSub" class="milestone-subtitle">Great job on Literary Elements!</p>
+
+            <div class="milestone-score-display">
+                <div class="score-segment">
+                    <div id="milestoneTaskScore" class="score-big">10 / 10</div>
+                    <div class="score-tag">Task Score</div>
+                </div>
+                <div class="score-segment">
+                    <div id="milestoneTaskXP" class="score-big">+100 XP</div>
+                    <div class="score-tag">Task XP</div>
+                </div>
+                <div class="score-segment">
+                    <div id="milestoneTaskStreak" class="score-big">x5</div>
+                    <div class="score-tag">Streak</div>
+                </div>
+            </div>
+
+            <button type="button" id="continueToNextTaskBtn" class="btn-launch">
+                <span id="continueBtnText">CONTINUE TO TASK 2</span>
+                <span>🚀</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- FINAL 32/32 COMPLETION MODAL -->
+    <div id="finalQuestCompleteModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+        <div class="modal-card milestone-card">
+            <div class="milestone-confetti-icon">🏆</div>
+            <h2 class="milestone-title">🎉 QUEST COMPLETE! 🎉</h2>
+            <p class="milestone-subtitle">You have answered all 32 questions across all 3 tasks.</p>
+
+            <div class="milestone-score-display">
+                <div class="score-segment">
+                    <div id="finalModalScore" class="score-big">32 / 32</div>
+                    <div class="score-tag">Completed</div>
+                </div>
+                <div class="score-segment">
+                    <div id="finalModalXP" class="score-big">+320 XP</div>
+                    <div class="score-tag">Total XP</div>
+                </div>
+                <div class="score-segment">
+                    <div id="finalModalStreak" class="score-big">x7</div>
+                    <div class="score-tag">Best Streak</div>
+                </div>
+            </div>
+
+            <button type="button" id="submitFinalQuestBtn" class="btn-launch btn-pulsing">
+                <span>SUBMIT ASSESSMENT</span>
+                <span>🚀</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- QUEST MAP OVERLAY MODAL -->
+    <div id="questMapModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+        <div class="modal-card quest-map-modal-card">
+            <div class="modal-header-row">
+                <h3 class="modal-title">🗺️ ENGLISH QUEST ROADMAP</h3>
+                <button type="button" id="closeQuestMapBtn" class="btn-close-modal" aria-label="Close Quest Map">✖</button>
+            </div>
+
+            <div class="map-modal-content">
+                <div class="quest-summary-pills">
+                    <div class="summary-pill"><span>Student:</span> <strong id="mapStudentName">Student</strong></div>
+                    <div class="summary-pill"><span>Total XP:</span> <strong id="mapTotalXP">0 / 320 XP</strong></div>
+                    <div class="summary-pill"><span>Time Left:</span> <strong id="mapTimeLeft">30:00</strong></div>
+                </div>
+
+                <div class="quest-map-steps modal-map-steps">
+                    <!-- Task 1 Item -->
+                    <div id="mapItemTask1" class="map-step-card step-unlocked" data-task="1">
+                        <div class="step-badge">1</div>
+                        <div class="step-info">
+                            <div class="step-header">
+                                <h4 class="step-title">Understanding Literary Elements</h4>
+                                <span id="mapStatusTask1" class="step-status-tag status-active">ACTIVE</span>
+                            </div>
+                            <p class="step-desc">10 Questions • Mara and the Tomato Plant</p>
+                        </div>
+                    </div>
+
+                    <!-- Task 2 Item -->
+                    <div id="mapItemTask2" class="map-step-card step-locked" data-task="2">
+                        <div class="step-badge">2</div>
+                        <div class="step-info">
+                            <div class="step-header">
+                                <h4 class="step-title">Analyzing & Evaluating Literary Text</h4>
+                                <span id="mapStatusTask2" class="step-status-tag status-locked">LOCKED</span>
+                            </div>
+                            <p class="step-desc">10 Questions • Values & Universal Truths</p>
+                        </div>
+                    </div>
+
+                    <!-- Task 3 Item -->
+                    <div id="mapItemTask3" class="map-step-card step-locked" data-task="3">
+                        <div class="step-badge">3</div>
+                        <div class="step-info">
+                            <div class="step-header">
+                                <h4 class="step-title">Language, Style, Cohesion & Culture</h4>
+                                <span id="mapStatusTask3" class="step-status-tag status-locked">LOCKED</span>
+                            </div>
+                            <p class="step-desc">12 Questions • Diction, Style & Filipino Culture</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" id="resumeQuestBtn" class="btn-launch btn-compact">
+                <span>RESUME QUEST</span>
+                <span>▶</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ANTI-CHEAT WARNING MODAL -->
+    <div id="antiCheatWarningModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+        <div class="modal-card anti-cheat-card">
+            <div class="warning-icon">⚠️</div>
+            <h2 class="warning-title">FOCUS ALERT!</h2>
+            <p class="warning-desc">Please stay on the quiz page. Leaving or switching browser tabs is monitored for assessment integrity.</p>
+            <div class="warning-counter-box">
+                <span>Violations Recorded:</span>
+                <strong id="antiCheatCount">1 / 3</strong>
+            </div>
+            <p class="warning-note">Exceeding 3 violations will automatically submit your quiz attempt.</p>
+            <button type="button" id="dismissAntiCheatBtn" class="btn-dismiss-warning">Return to Quest</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/questions.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/firebase.js"></script>
+    <script src="js/quiz.js"></script>
+</body>
+</html>

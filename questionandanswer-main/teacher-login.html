@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover"
+    />
+    <title>Teacher Login — English Quest</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/teacher.css" />
+    <!-- Firebase SDK (CDN compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  </head>
+  <body class="teacher-auth-body">
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+
+    <div class="auth-page-container">
+      <!-- Top Navigation -->
+      <div class="top-bar">
+        <a href="index.html" class="back-link">← Back to Portal</a>
+        <div class="brand-mini">🎓 ENGLISH QUEST</div>
+      </div>
+
+      <div class="teacher-auth-card">
+        <div class="auth-badge-icon">👩‍🏫</div>
+        <h1 class="auth-title">TEACHER LOGIN</h1>
+        <p class="auth-desc">
+          Sign in with Firebase Authentication to access student submissions &
+          analytics.
+        </p>
+
+        <div id="authErrorAlert" class="alert-box alert-danger hidden"></div>
+        <div id="authSuccessAlert" class="alert-box alert-success hidden"></div>
+
+        <form id="teacherLoginForm" class="teacher-form">
+          <div class="form-field">
+            <label for="teacherEmail" class="field-label">Teacher Email</label>
+            <div class="field-input-box">
+              <span class="field-icon">📧</span>
+              <input
+                type="email"
+                id="teacherEmail"
+                class="field-input"
+                placeholder="Enter teacher email"
+                required
+                autocomplete="email"
+              />
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="teacherPassword" class="field-label">Password</label>
+            <div class="field-input-box">
+              <span class="field-icon">🔒</span>
+              <input
+                type="password"
+                id="teacherPassword"
+                class="field-input"
+                placeholder="••••••••"
+                required
+                autocomplete="current-password"
+              />
+            </div>
+          </div>
+
+          <button type="submit" id="loginSubmitBtn" class="btn-launch btn-auth">
+            <span>LOGIN TO DASHBOARD</span>
+            <span>📊</span>
+          </button>
+
+          <div class="auth-links-row">
+            <a href="#" id="showResetBtn" class="link-small"
+              >Forgot Password?</a
+            >
+          </div>
+        </form>
+
+        <form id="resetPasswordForm" class="teacher-form hidden">
+          <div class="form-field">
+            <label for="resetEmail" class="field-label"
+              >Registered Teacher Email</label
+            >
+            <div class="field-input-box">
+              <span class="field-icon">📧</span>
+              <input
+                type="email"
+                id="resetEmail"
+                class="field-input"
+                placeholder="Enter registered email"
+                required
+              />
+            </div>
+          </div>
+
+          <button type="submit" id="resetSubmitBtn" class="btn-launch btn-auth">
+            <span>Send Password Reset Link</span>
+          </button>
+
+          <div class="auth-links-row">
+            <a href="#" id="backToLoginBtn" class="link-small"
+              >← Back to Sign In</a
+            >
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="js/firebase.js"></script>
+    <script src="js/teacher-auth.js"></script>
+  </body>
+</html>
