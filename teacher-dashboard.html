@@ -116,6 +116,26 @@
           </div>
         </section>
 
+        <!-- View Filter Tabs -->
+        <section class="dash-tabs-bar">
+          <button type="button" class="dash-tab-btn active" data-view="all">
+            <span>📋 All Learners</span>
+            <span id="tabCountAll" class="dash-tab-badge">0</span>
+          </button>
+          <button type="button" class="dash-tab-btn" data-view="in_progress">
+            <span>🟡 Live / In Progress</span>
+            <span id="tabCountLive" class="dash-tab-badge">0</span>
+          </button>
+          <button type="button" class="dash-tab-btn" data-view="completed">
+            <span>🟢 Completed</span>
+            <span id="tabCountCompleted" class="dash-tab-badge">0</span>
+          </button>
+          <button type="button" class="dash-tab-btn" data-view="auto_submitted">
+            <span>🔴 Auto-Submitted / Alerts</span>
+            <span id="tabCountAuto" class="dash-tab-badge">0</span>
+          </button>
+        </section>
+
         <!-- Toolbar & Search -->
         <section class="dash-toolbar">
           <div class="search-input-wrap">
@@ -124,13 +144,21 @@
               type="text"
               id="searchInput"
               class="search-field"
-              placeholder="Search student name or section..."
+              placeholder="Search by student name, ID, or section..."
             />
           </div>
 
           <div class="toolbar-actions">
             <select id="sectionFilter" class="filter-dropdown">
               <option value="all">All Sections</option>
+            </select>
+
+            <select id="statusFilter" class="filter-dropdown">
+              <option value="all">All Statuses</option>
+              <option value="in_progress">🟡 In Progress</option>
+              <option value="completed">🟢 Completed</option>
+              <option value="auto_submitted">🔴 Auto-Submitted</option>
+              <option value="expired">⚪ Abandoned / Expired</option>
             </select>
 
             <select id="scoreFilter" class="filter-dropdown">
@@ -141,7 +169,7 @@
             </select>
 
             <button type="button" id="refreshDataBtn" class="btn-tool">
-              <span>🔄 Refresh</span>
+              <span>🔄 Sync Now</span>
             </button>
 
             <button
@@ -157,9 +185,9 @@
         <!-- Results Table -->
         <section class="dash-table-card">
           <div class="table-meta-bar">
-            <span id="resultCountBadge">Showing 0 submissions</span>
+            <span id="resultCountBadge">Showing 0 learners</span>
             <span id="tableLoading" class="hidden loading-indicator"
-              >⏳ Loading results...</span
+              >⏳ Live sync in progress...</span
             >
           </div>
 
@@ -167,21 +195,18 @@
             <table class="submissions-table">
               <thead>
                 <tr>
-                  <th data-sort="studentName">Student Name ↕</th>
+                  <th data-sort="studentName">Student ↕</th>
                   <th data-sort="section">Section ↕</th>
-                  <th data-sort="t1" class="text-center">Task 1 (/10) ↕</th>
-                  <th data-sort="t2" class="text-center">Task 2 (/10) ↕</th>
-                  <th data-sort="t3" class="text-center">Task 3 (/12) ↕</th>
-                  <th data-sort="totalScore" class="text-center">
-                    Total (/32) ↕
-                  </th>
-                  <th data-sort="percentage" class="text-center">Score % ↕</th>
-                  <th data-sort="completedAt">Date Completed ↕</th>
+                  <th data-sort="currentTask" class="text-center">Task ↕</th>
+                  <th data-sort="progressPercentage">Progress ↕</th>
+                  <th data-sort="score" class="text-center">Score ↕</th>
+                  <th data-sort="status" class="text-center">Status ↕</th>
+                  <th data-sort="updatedAt">Last Activity ↕</th>
                   <th class="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody id="resultsTableBody">
-                <!-- Injected by teacher-dashboard.js -->
+                <!-- Injected in real-time by teacher-dashboard.js -->
               </tbody>
             </table>
           </div>
@@ -189,209 +214,482 @@
       </div>
     </main>
 
-    <!-- Student Detail Modal -->
-    <div id="studentDetailModal" class="modal-backdrop hidden">
+    <!-- Student Detail Assessment Modal -->
+    <div
+      id="studentDetailModal"
+      class="modal-backdrop hidden"
+      role="dialog"
+      aria-modal="true"
+    >
       <div class="modal-card modal-detail-box">
-        <div class="detail-header">
-          <div>
-            <span class="detail-tag">STUDENT RESULT</span>
-            <h2 id="modalStudentName" class="detail-name">Juan Dela Cruz</h2>
-            <div
-              style="
-                font-size: 0.85rem;
-                color: #64748b;
-                font-weight: 700;
-                margin-top: 0.2rem;
-              "
-            >
-              Section:
-              <span id="modalStudentSection" class="section-pill"
-                >Grade 10</span
+        <!-- Top Bar -->
+        <div class="modal-top-bar">
+          <div class="modal-header-info">
+            <div id="modalAvatar" class="modal-avatar-badge">👨‍🎓</div>
+            <div class="modal-title-wrap">
+              <span
+                id="modalDetailTag"
+                class="status-pill status-completed"
+                style="
+                  font-size: 0.72rem;
+                  padding: 0.15rem 0.5rem;
+                  margin-bottom: 0.25rem;
+                "
+                >🟢 Completed Assessment</span
+              >
+              <h2 id="modalStudentName">Juan Dela Cruz</h2>
+              <div class="modal-subtitle-meta">
+                <span
+                  >Section:
+                  <strong id="modalStudentSection" class="section-pill"
+                    >Grade 10</strong
+                  ></span
+                >
+                <span
+                  >• ID:
+                  <code
+                    id="modalStudentId"
+                    style="
+                      font-size: 0.75rem;
+                      color: #475569;
+                      background: #f1f5f9;
+                      padding: 0.1rem 0.35rem;
+                      border-radius: 4px;
+                    "
+                    >student_juan</code
+                  ></span
+                >
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            id="closeModalBtnTop"
+            class="modal-close-icon-btn"
+            title="Close modal"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Body Content -->
+        <div class="modal-body-scroll">
+          <!-- 4 KPI Summary Cards -->
+          <div class="modal-kpi-grid">
+            <div class="modal-kpi-card highlight">
+              <div class="mkpi-icon">🎯</div>
+              <div id="modalFinalScore" class="mkpi-val">24 / 32</div>
+              <div
+                id="modalPercentage"
+                class="mkpi-label"
+                style="color: #4f46e5; font-weight: 900"
+              >
+                75% Score
+              </div>
+            </div>
+            <div class="modal-kpi-card">
+              <div class="mkpi-icon">⚡</div>
+              <div id="modalXP" class="mkpi-val">+240</div>
+              <div class="mkpi-label">XP Earned</div>
+            </div>
+            <div class="modal-kpi-card">
+              <div class="mkpi-icon">⏱️</div>
+              <div id="modalTimeUsed" class="mkpi-val">18:42</div>
+              <div class="mkpi-label">Time Used</div>
+            </div>
+            <div class="modal-kpi-card">
+              <div class="mkpi-icon">🔥</div>
+              <div id="modalStreak" class="mkpi-val">x5</div>
+              <div class="mkpi-label">Max Streak</div>
+            </div>
+          </div>
+
+          <!-- Task Breakdown Section -->
+          <div class="modal-section-title">
+            <span>📊</span>
+            <span>Task-by-Task Mastery Breakdown</span>
+          </div>
+
+          <div class="modal-tasks-breakdown">
+            <!-- Task 1 -->
+            <div class="task-breakdown-card task1-accent">
+              <div class="tbc-header">
+                <span class="tbc-title"
+                  >🎯 Task 1 — Literary Elements & Textual Evidence</span
+                >
+                <span id="modalT1Score" class="tbc-score-badge">8 / 10</span>
+              </div>
+              <div class="tbc-progress-bar">
+                <div
+                  id="modalT1Bar"
+                  class="tbc-progress-fill"
+                  style="width: 80%"
+                ></div>
+              </div>
+              <div id="modalT1Chips" class="tbc-chips">
+                <span id="modalT1CorrectChip" class="chip-stat chip-correct"
+                  >✅ 8 Correct</span
+                >
+                <span id="modalT1WrongChip" class="chip-stat chip-wrong"
+                  >❌ 2 Wrong</span
+                >
+                <span
+                  id="modalT1UnansweredChip"
+                  class="chip-stat chip-unanswered"
+                  style="display: none"
+                  >⏳ 0 Unanswered</span
+                >
+              </div>
+            </div>
+
+            <!-- Task 2 -->
+            <div class="task-breakdown-card task2-accent">
+              <div class="tbc-header">
+                <span class="tbc-title"
+                  >🔎 Task 2 — Vocabulary & Context Clues</span
+                >
+                <span id="modalT2Score" class="tbc-score-badge">7 / 10</span>
+              </div>
+              <div class="tbc-progress-bar">
+                <div
+                  id="modalT2Bar"
+                  class="tbc-progress-fill"
+                  style="width: 70%"
+                ></div>
+              </div>
+              <div id="modalT2Chips" class="tbc-chips">
+                <span id="modalT2CorrectChip" class="chip-stat chip-correct"
+                  >✅ 7 Correct</span
+                >
+                <span id="modalT2WrongChip" class="chip-stat chip-wrong"
+                  >❌ 3 Wrong</span
+                >
+                <span
+                  id="modalT2UnansweredChip"
+                  class="chip-stat chip-unanswered"
+                  style="display: none"
+                  >⏳ 0 Unanswered</span
+                >
+              </div>
+            </div>
+
+            <!-- Task 3 -->
+            <div class="task-breakdown-card task3-accent">
+              <div class="tbc-header">
+                <span class="tbc-title"
+                  >✍️ Task 3 — Language, Style, Cohesion & Culture</span
+                >
+                <span id="modalT3Score" class="tbc-score-badge">9 / 12</span>
+              </div>
+              <div class="tbc-progress-bar">
+                <div
+                  id="modalT3Bar"
+                  class="tbc-progress-fill"
+                  style="width: 75%"
+                ></div>
+              </div>
+              <div id="modalT3Chips" class="tbc-chips">
+                <span id="modalT3CorrectChip" class="chip-stat chip-correct"
+                  >✅ 9 Correct</span
+                >
+                <span id="modalT3WrongChip" class="chip-stat chip-wrong"
+                  >❌ 3 Wrong</span
+                >
+                <span
+                  id="modalT3UnansweredChip"
+                  class="chip-stat chip-unanswered"
+                  style="display: none"
+                  >⏳ 0 Unanswered</span
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Session Metadata Banner -->
+          <div class="modal-meta-banner">
+            <div>
+              📅 Session Date:
+              <strong id="modalDate" style="color: #0f172a"
+                >September 4, 2026</strong
+              >
+            </div>
+            <div>
+              🛡️ Violations:
+              <strong id="modalTabSwitches" style="color: #0f172a"
+                >0 tab switches</strong
               >
             </div>
           </div>
-          <div class="detail-score-box">
-            <span id="modalFinalScore" class="detail-score-val">24 / 32</span>
-            <span id="modalPercentage" class="detail-pill">75%</span>
+
+          <!-- Auto-submit warning if applicable -->
+          <div
+            id="modalAutoSubmitWarning"
+            class="alert-box alert-danger hidden"
+          >
+            ⚠️ Note: This quiz was automatically submitted due to multiple
+            tab-switch integrity alerts.
           </div>
         </div>
 
-        <hr class="detail-hr" />
-
-        <div class="detail-tasks-list">
-          <div class="detail-task-card">
-            <div class="dt-header">
-              <strong>🎯 TASK 1 — Literary Elements</strong>
-              <span id="modalT1Score" class="dt-score">8 / 10</span>
-            </div>
-            <div id="modalT1Breakdown" class="dt-sub">
-              Correct: 8 | Wrong: 2 | Unanswered: 0
-            </div>
-          </div>
-
-          <div class="detail-task-card">
-            <div class="dt-header">
-              <strong>🔎 TASK 2 — Analyzing & Evaluating</strong>
-              <span id="modalT2Score" class="dt-score">7 / 10</span>
-            </div>
-            <div id="modalT2Breakdown" class="dt-sub">
-              Correct: 7 | Wrong: 3 | Unanswered: 0
-            </div>
-          </div>
-
-          <div class="detail-task-card">
-            <div class="dt-header">
-              <strong>✍️ TASK 3 — Style, Cohesion & Culture</strong>
-              <span id="modalT3Score" class="dt-score">9 / 12</span>
-            </div>
-            <div id="modalT3Breakdown" class="dt-sub">
-              Correct: 9 | Wrong: 3 | Unanswered: 0
-            </div>
-          </div>
-        </div>
-
-        <div class="detail-meta-footer">
-          <div>⏱️ Time Used: <strong id="modalTimeUsed">18:42</strong></div>
-          <div>
-            📅 Completed: <strong id="modalDate">September 4, 2026</strong>
-          </div>
-        </div>
-
-        <div
-          id="modalAutoSubmitWarning"
-          class="alert-box alert-danger hidden"
-          style="margin-top: 1rem"
-        >
-          ⚠️ Note: This quiz was automatically submitted due to multiple
-          tab-switch alerts.
-        </div>
-
-        <div class="detail-btn-row">
-          <button type="button" id="closeModalBtn" class="btn-close-modal">
-            Close
+        <!-- Bottom Bar -->
+        <div class="modal-bottom-bar">
+          <button
+            type="button"
+            id="copyStudentSummaryBtn"
+            class="btn-modal-action btn-secondary"
+          >
+            <span>📋 Copy Result Summary</span>
+          </button>
+          <button
+            type="button"
+            id="closeModalBtn"
+            class="btn-modal-action btn-primary"
+          >
+            <span>Done / Close</span>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Official Teacher Answer Key Modal (Requirement 13) -->
-    <div id="answerKeyModal" class="modal-backdrop hidden">
-      <div class="modal-card modal-detail-box" style="max-width: 650px">
-        <div class="detail-header">
-          <div>
-            <span class="detail-tag">CONFIDENTIAL TEACHER COPY</span>
-            <h2 class="detail-name">🔑 Official Master Answer Key</h2>
+    <!-- Official Teacher Answer Key Modal -->
+    <div
+      id="answerKeyModal"
+      class="modal-backdrop hidden"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-card modal-answer-key-box">
+        <!-- Top Bar -->
+        <div class="modal-top-bar">
+          <div class="modal-header-info">
+            <div
+              class="modal-avatar-badge"
+              style="
+                background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+                box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+              "
+            >
+              🔑
+            </div>
+            <div class="modal-title-wrap">
+              <span
+                class="status-pill"
+                style="
+                  background: #e0f2fe;
+                  color: #0369a1;
+                  font-size: 0.72rem;
+                  padding: 0.15rem 0.5rem;
+                  margin-bottom: 0.25rem;
+                "
+                >CONFIDENTIAL TEACHER COPY</span
+              >
+              <h2>Official Master Answer Key</h2>
+              <div class="modal-subtitle-meta">
+                <span>Grade 10 English Remediation Assessment</span>
+                <span>• 3 Tasks • 32 Items Total</span>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            id="closeAnswerKeyBtnTop"
+            class="modal-close-icon-btn"
+            title="Close key"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Body Content (3 Column Grid) -->
+        <div class="modal-body-scroll">
+          <div class="answer-key-task-grid">
+            <!-- Task 1 Card -->
+            <div class="ak-task-card task1-theme">
+              <div class="ak-card-head">
+                <div class="ak-card-title">🎯 TASK 1 (10 Items)</div>
+                <div class="ak-card-sub">Literary Elements & Comprehension</div>
+              </div>
+              <div class="ak-items-flow">
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q01</span>
+                  <span class="ak-item-letter">C</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q02</span>
+                  <span class="ak-item-letter">C</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q03</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q04</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q05</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q06</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q07</span>
+                  <span class="ak-item-letter">C</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q08</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q09</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q10</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+              </div>
+              <div class="ak-task-footer">10 Points • Pass benchmark: 8/10</div>
+            </div>
+
+            <!-- Task 2 Card -->
+            <div class="ak-task-card task2-theme">
+              <div class="ak-card-head">
+                <div class="ak-card-title">🔎 TASK 2 (10 Items)</div>
+                <div class="ak-card-sub">Vocabulary & Context Clues</div>
+              </div>
+              <div class="ak-items-flow">
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q01</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q02</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q03</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q04</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q05</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q06</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q07</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q08</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q09</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q10</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+              </div>
+              <div class="ak-task-footer">10 Points • Pass benchmark: 8/10</div>
+            </div>
+
+            <!-- Task 3 Card -->
+            <div class="ak-task-card task3-theme">
+              <div class="ak-card-head">
+                <div class="ak-card-title">✍️ TASK 3 (12 Items)</div>
+                <div class="ak-card-sub">
+                  Style, Cohesion & Filipino Culture
+                </div>
+              </div>
+              <div class="ak-items-flow">
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q01</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q02</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q03</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q04</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q05</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q06</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q07</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q08</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q09</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q10</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q11</span>
+                  <span class="ak-item-letter">B</span>
+                </div>
+                <div class="ak-item-pill">
+                  <span class="ak-item-num">Q12</span>
+                  <span class="ak-item-letter">A</span>
+                </div>
+              </div>
+              <div class="ak-task-footer">12 Points • Pass benchmark: 9/12</div>
+            </div>
           </div>
         </div>
 
-        <hr class="detail-hr" />
-
-        <div
-          style="
-            text-align: left;
-            max-height: 420px;
-            overflow-y: auto;
-            padding-right: 0.5rem;
-          "
-        >
-          <div
-            style="
-              background: #f8fafc;
-              border: 1.5px solid #e2e8f0;
-              border-radius: var(--radius-md);
-              padding: 1.25rem;
-              margin-bottom: 1rem;
-            "
+        <!-- Bottom Bar -->
+        <div class="modal-bottom-bar">
+          <button
+            type="button"
+            id="copyAnswerKeyBtn"
+            class="btn-modal-action btn-secondary"
           >
-            <h3
-              style="color: #4f46e5; font-size: 1.05rem; margin-bottom: 0.5rem"
-            >
-              🎯 TASK 1 — Understanding Literary Elements (10 Questions)
-            </h3>
-            <p
-              style="
-                font-family: var(--font-mono);
-                font-size: 0.95rem;
-                font-weight: 700;
-                line-height: 1.8;
-              "
-            >
-              1-C &nbsp;•&nbsp; 2-C &nbsp;•&nbsp; 3-B &nbsp;•&nbsp; 4-A
-              &nbsp;•&nbsp; 5-B<br />
-              6-A &nbsp;•&nbsp; 7-C &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-A
-              &nbsp;•&nbsp; 10-B
-            </p>
-          </div>
-
-          <div
-            style="
-              background: #f8fafc;
-              border: 1.5px solid #e2e8f0;
-              border-radius: var(--radius-md);
-              padding: 1.25rem;
-              margin-bottom: 1rem;
-            "
+            <span>📋 Copy Key Text</span>
+          </button>
+          <button
+            type="button"
+            id="closeAnswerKeyBtn"
+            class="btn-modal-action btn-primary"
           >
-            <h3
-              style="color: #0284c7; font-size: 1.05rem; margin-bottom: 0.5rem"
-            >
-              🔎 TASK 2 — Analyzing and Evaluating a Literary Text (10
-              Questions)
-            </h3>
-            <p
-              style="
-                font-family: var(--font-mono);
-                font-size: 0.95rem;
-                font-weight: 700;
-                line-height: 1.8;
-              "
-            >
-              1-B &nbsp;•&nbsp; 2-A &nbsp;•&nbsp; 3-A &nbsp;•&nbsp; 4-A
-              &nbsp;•&nbsp; 5-B<br />
-              6-B &nbsp;•&nbsp; 7-A &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-B
-              &nbsp;•&nbsp; 10-A
-            </p>
-          </div>
-
-          <div
-            style="
-              background: #f8fafc;
-              border: 1.5px solid #e2e8f0;
-              border-radius: var(--radius-md);
-              padding: 1.25rem;
-              margin-bottom: 1rem;
-            "
-          >
-            <h3
-              style="color: #059669; font-size: 1.05rem; margin-bottom: 0.5rem"
-            >
-              ✍️ TASK 3 — Language, Style, Cohesion, and Culture (12 Questions)
-            </h3>
-            <p
-              style="
-                font-family: var(--font-mono);
-                font-size: 0.95rem;
-                font-weight: 700;
-                line-height: 1.8;
-              "
-            >
-              1-A &nbsp;•&nbsp; 2-B &nbsp;•&nbsp; 3-A &nbsp;•&nbsp; 4-A
-              &nbsp;•&nbsp; 5-A &nbsp;•&nbsp; 6-B<br />
-              7-A &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-A &nbsp;•&nbsp; 10-A
-              &nbsp;•&nbsp; 11-B &nbsp;•&nbsp; 12-A
-            </p>
-          </div>
-        </div>
-
-        <div class="detail-btn-row">
-          <button type="button" id="closeAnswerKeyBtn" class="btn-close-modal">
-            Close Answer Key
+            <span>Close Answer Key</span>
           </button>
         </div>
       </div>
     </div>
 
     <!-- Scripts -->
+    <script src="js/config.js"></script>
     <script src="js/questions.js"></script>
     <script src="js/firebase.js"></script>
     <script src="js/teacher-dashboard.js"></script>

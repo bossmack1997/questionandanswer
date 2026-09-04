@@ -193,30 +193,70 @@ class FirebaseService {
 
     /**
      * Save/Update in-progress attempt in real time (Multi-device state).
+     * Maintains complete attempt schema required for real-time teacher monitoring.
      */
     async saveActiveAttempt(attemptData) {
         if (!attemptData) return false;
-        const studentId = attemptData.student_id || this.normalizeStudentId(attemptData.student_name || attemptData.studentName, attemptData.section || attemptData.studentSection);
-        attemptData.student_id = studentId;
-        attemptData.section = attemptData.section || attemptData.studentSection || 'Grade 10';
-        attemptData.status = 'in_progress';
-        attemptData.last_activity_at = new Date().toISOString();
+        const studentName = attemptData.studentName || attemptData.student_name || 'Student';
+        const section = attemptData.section || attemptData.studentSection || attemptData.student_section || 'Grade 10';
+        const studentId = attemptData.studentId || attemptData.student_id || this.normalizeStudentId(studentName, section);
+        const attemptId = attemptData.attemptId || attemptData.attempt_id || ('quest_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+
+        const totalQ = attemptData.totalQuestions || 32;
+        const answersMap = attemptData.answersMap || attemptData.selected_answers || {};
+        const answeredQ = attemptData.answeredQuestions !== undefined ? attemptData.answeredQuestions : Object.keys(answersMap).length;
+        const score = typeof attemptData.score === 'number' ? attemptData.score : (attemptData.correctAnswers || 0);
+        const correctAnswers = attemptData.correctAnswers !== undefined ? attemptData.correctAnswers : score;
+        const wrongAnswers = attemptData.wrongAnswers !== undefined ? attemptData.wrongAnswers : Math.max(0, answeredQ - correctAnswers);
+        const progressPct = totalQ > 0 ? Math.min(100, Math.round((answeredQ / totalQ) * 100)) : 0;
+        const currentQ = attemptData.currentQuestion !== undefined ? attemptData.currentQuestion : ((attemptData.currentQuestionIndex !== undefined ? attemptData.currentQuestionIndex : 0) + 1);
+        const nowIso = new Date().toISOString();
+
+        const payload = {
+            attemptId: attemptId,
+            studentId: studentId,
+            studentName: studentName,
+            section: section,
+            studentSection: section,
+            status: attemptData.status || 'in_progress',
+            currentTask: attemptData.currentTask || 1,
+            currentQuestion: currentQ,
+            currentQuestionIndex: attemptData.currentQuestionIndex !== undefined ? attemptData.currentQuestionIndex : (currentQ - 1),
+            totalQuestions: totalQ,
+            answeredQuestions: answeredQ,
+            correctAnswers: correctAnswers,
+            wrongAnswers: wrongAnswers,
+            progressPercentage: progressPct,
+            score: score,
+            earnedXP: attemptData.earnedXP || (score * 10),
+            streak: attemptData.streak || 0,
+            maxStreak: attemptData.maxStreak || 0,
+            tabSwitches: attemptData.tabSwitches || 0,
+            timeRemaining: attemptData.timeRemaining !== undefined ? attemptData.timeRemaining : null,
+            totalTimeUsed: attemptData.totalTimeUsed || 0,
+            startedAt: attemptData.startedAt || attemptData.started_at || nowIso,
+            startedAtMs: attemptData.startedAtMs || attemptData.started_at_ms || Date.now(),
+            updatedAt: nowIso,
+            submittedAt: attemptData.submittedAt || null,
+            answersMap: answersMap,
+            taskQuestions: attemptData.taskQuestions || {},
+            taskScores: attemptData.taskScores || {},
+            attemptAudit: attemptData.attemptAudit || attemptData.attempt_audit || {}
+        };
 
         // Save to local cache immediately
         try {
-            localStorage.setItem('english10_active_attempt_' + studentId, JSON.stringify(attemptData));
-            if (attemptData.student_name || attemptData.studentName) {
-                localStorage.setItem('english10_quest_attempt_' + (attemptData.student_name || attemptData.studentName), JSON.stringify(attemptData));
-            }
+            localStorage.setItem('english10_active_attempt_' + studentId, JSON.stringify(payload));
+            localStorage.setItem('english10_quest_attempt_' + studentName, JSON.stringify(payload));
         } catch (e) {
             console.warn('[FirebaseService] LocalStorage write warning:', e);
         }
 
-        // Push to Cloud Firestore
+        // Push to Cloud Firestore collection 'active_attempts'
         if (this.initialized && this.db && navigator.onLine) {
             try {
                 await this.db.collection('active_attempts').doc(studentId).set({
-                    ...attemptData,
+                    ...payload,
                     server_updated_at: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 return true;
@@ -239,8 +279,9 @@ class FirebaseService {
             try {
                 await this.db.collection('active_attempts').doc(id).set({
                     answersMap: { [questionId]: selectedOptionId },
-                    last_activity_at: new Date().toISOString(),
-                    server_updated_at: firebase.firestore.FieldValue.serverTimestamp()
+                    updatedAt: new Date().toISOString(),
+                    server_updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+                    ...extraData
                 }, { merge: true });
                 return true;
             } catch (err) {
@@ -527,6 +568,74 @@ class FirebaseService {
         await this.deleteActiveAttempt(studentId, studentName);
 
         return payload;
+    }
+
+    /**
+     * Real-time Firestore Listener for In-Progress Quiz Attempts (Teacher Live Monitoring).
+     * Automatically triggers callback whenever a student starts, answers, moves tasks, or updates.
+     */
+    listenToActiveAttempts(onUpdate, onError) {
+        if (this.initialized && this.db) {
+            try {
+                return this.db.collection('active_attempts').onSnapshot((snapshot) => {
+                    const attempts = [];
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        attempts.push({ id: doc.id, ...data });
+                    });
+                    if (typeof onUpdate === 'function') {
+                        onUpdate(attempts);
+                    }
+                }, (err) => {
+                    console.warn('[FirebaseService] active_attempts snapshot warning:', err.message);
+                    if (typeof onError === 'function') onError(err);
+                });
+            } catch (err) {
+                console.error('[FirebaseService] Error setting up active_attempts snapshot listener:', err);
+                if (typeof onError === 'function') onError(err);
+                return () => {};
+            }
+        }
+        return () => {};
+    }
+
+    /**
+     * Real-time Firestore Listener for Completed Quiz Results (Teacher Historical & Live Submissions).
+     * Automatically triggers callback whenever a final quiz result is saved.
+     */
+    listenToQuizResults(onUpdate, onError) {
+        if (this.initialized && this.db) {
+            try {
+                return this.db.collection('quiz_results').orderBy('completedAt', 'desc').onSnapshot((snapshot) => {
+                    const results = [];
+                    snapshot.forEach(doc => {
+                        const d = doc.data();
+                        let dateStr = new Date().toISOString();
+                        if (d.completedAt && d.completedAt.toDate) {
+                            dateStr = d.completedAt.toDate().toISOString();
+                        } else if (typeof d.completedAt === 'string') {
+                            dateStr = d.completedAt;
+                        }
+                        results.push({
+                            id: doc.id,
+                            ...d,
+                            completedAt: dateStr
+                        });
+                    });
+                    if (typeof onUpdate === 'function') {
+                        onUpdate(results);
+                    }
+                }, (err) => {
+                    console.warn('[FirebaseService] quiz_results snapshot warning:', err.message);
+                    if (typeof onError === 'function') onError(err);
+                });
+            } catch (err) {
+                console.error('[FirebaseService] Error setting up quiz_results snapshot listener:', err);
+                if (typeof onError === 'function') onError(err);
+                return () => {};
+            }
+        }
+        return () => {};
     }
 
     /**
