@@ -4,25 +4,104 @@
  * smooth score count-up animations, full answer review modal, and printable certificate.
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Retrieve result data safely from multiple fallback keys
-    const studentName = localStorage.getItem('studentName') || sessionStorage.getItem('studentName') || '';
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Identify student
+    let studentName = '';
+    let studentId = '';
+
+    if (window.AuthManager && typeof window.AuthManager.getCurrentStudent === 'function') {
+        const authData = window.AuthManager.getCurrentStudent();
+        if (authData) {
+            studentName = authData.name;
+            studentId = authData.id;
+        }
+    }
+
+    if (!studentName) {
+        studentName = localStorage.getItem('studentName') || sessionStorage.getItem('studentName') || '';
+    }
+
+    if (window.firebaseService && studentName) {
+        studentId = window.firebaseService.normalizeStudentId(studentName);
+    } else if (studentName) {
+        studentId = 'student_' + studentName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+    }
+
+    // Check if a specific task was requested via URL, e.g. result.html?task=1
+    const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
+    const requestedTask = urlParams ? parseInt(urlParams.get('task'), 10) : null;
+
+    // 2. Retrieve result data safely from multiple fallback keys or Firestore
+    let result = null;
     const raw = sessionStorage.getItem('english10_last_result') || 
                 sessionStorage.getItem('english10_final_result') || 
                 localStorage.getItem('english10_last_result') ||
-                localStorage.getItem('english10_last_result_' + studentName);
-    
-    if (!raw) {
-        window.location.replace('student.html');
-        return;
+                localStorage.getItem('english10_last_result_' + studentName) ||
+                localStorage.getItem('english10_last_result_' + studentId);
+
+    if (raw) {
+        try {
+            result = JSON.parse(raw);
+        } catch (e) {
+            console.warn('Failed to parse cached quiz result:', e);
+        }
     }
 
-    let result;
-    try {
-        result = JSON.parse(raw);
-    } catch (e) {
-        console.error('Failed to parse quiz result:', e);
-        window.location.replace('student.html');
+    // If no local result, try fetching from Firestore
+    if (!result && studentId && window.firebaseService) {
+        try {
+            const submissions = await window.firebaseService.getAllTaskSubmissionsForStudent(studentId);
+            if (submissions && (submissions.task1 || submissions.task2 || submissions.task3)) {
+                const t1 = submissions.task1 || {};
+                const t2 = submissions.task2 || {};
+                const t3 = submissions.task3 || {};
+
+                const t1Score = t1.score || 0;
+                const t2Score = t2.score || 0;
+                const t3Score = t3.score || 0;
+                const totalScore = t1Score + t2Score + t3Score;
+
+                const combinedAnswers = Object.assign({}, t1.answers || {}, t2.answers || {}, t3.answers || {});
+
+                result = {
+                    studentName: studentName,
+                    studentId: studentId,
+                    task1Score: t1Score,
+                    task1Correct: t1.correctCount !== undefined ? t1.correctCount : t1Score,
+                    task1Wrong: t1.wrongCount !== undefined ? t1.wrongCount : (10 - t1Score),
+                    task1Unanswered: t1.unansweredCount || 0,
+
+                    task2Score: t2Score,
+                    task2Correct: t2.correctCount !== undefined ? t2.correctCount : t2Score,
+                    task2Wrong: t2.wrongCount !== undefined ? t2.wrongCount : (10 - t2Score),
+                    task2Unanswered: t2.unansweredCount || 0,
+
+                    task3Score: t3Score,
+                    task3Correct: t3.correctCount !== undefined ? t3.correctCount : t3Score,
+                    task3Wrong: t3.wrongCount !== undefined ? t3.wrongCount : (12 - t3Score),
+                    task3Unanswered: t3.unansweredCount || 0,
+
+                    totalScore: totalScore,
+                    totalQuestions: 32,
+                    percentage: Number(((totalScore / 32) * 100).toFixed(2)),
+                    earnedXP: totalScore * 10,
+                    maxStreak: 5,
+                    timeUsed: 0,
+                    completedAt: t3.submittedAt || t2.submittedAt || t1.submittedAt || new Date().toISOString(),
+                    answersMap: combinedAnswers
+                };
+            }
+        } catch (e) {
+            console.error('Failed to retrieve cloud submissions:', e);
+        }
+    }
+
+    if (!result) {
+        if (studentName) {
+            window.location.replace('student.html');
+        } else {
+            window.location.replace('index.html');
+        }
         return;
     }
 
@@ -52,7 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         reviewBtn: document.getElementById('reviewAnswersBtn'),
         printBtn: document.getElementById('printReportBtn'),
-        retakeBtn: document.getElementById('retakeQuizBtn'),
 
         reviewModal: document.getElementById('answerReviewModal'),
         reviewItemsList: document.getElementById('reviewItemsList'),
@@ -126,24 +204,9 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.printBtn.addEventListener('click', () => window.print());
     }
 
-    if (dom.retakeBtn) {
-        dom.retakeBtn.addEventListener('click', () => {
-            const name = result.studentName || localStorage.getItem('studentName') || '';
-            const studentId = window.firebaseService ? window.firebaseService.normalizeStudentId(name) : ('student_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_'));
-            
-            localStorage.removeItem('englishQuest_attempt_v1_' + name);
-            localStorage.removeItem('english10_quest_attempt_' + name);
-            localStorage.removeItem('english10_active_attempt_' + studentId);
-            sessionStorage.removeItem('english10_active_state');
-            sessionStorage.removeItem('english10_last_result');
-            
-            window.location.href = 'student.html';
-        });
-    }
-
     if (dom.reviewBtn) {
         dom.reviewBtn.addEventListener('click', () => {
-            renderAnswerReviewModal(result, dom.reviewItemsList);
+            renderAnswerReviewModal(result, dom.reviewItemsList, requestedTask);
             dom.reviewModal.classList.remove('hidden');
         });
     }
@@ -203,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderAnswerReviewModal(res, container) {
+    function renderAnswerReviewModal(res, container, filterTask = null) {
         if (!container) return;
         container.innerHTML = '';
 
@@ -211,7 +274,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const allQuestions = [];
 
         // Aggregate questions from master bank
-        ['task1', 'task2', 'task3'].forEach(taskKey => {
+        const taskKeys = filterTask ? ['task' + filterTask] : ['task1', 'task2', 'task3'];
+        taskKeys.forEach(taskKey => {
             if (typeof masterQuestionBank !== 'undefined' && masterQuestionBank[taskKey]) {
                 allQuestions.push(...masterQuestionBank[taskKey]);
             }
@@ -222,8 +286,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const isCorrect = (userChoiceId === q.correct_option_id);
             const isUnanswered = !userChoiceId;
 
-            const correctChoice = q.choices.find(c => c.option_id === q.correct_option_id);
-            const userChoice = q.choices.find(c => c.option_id === userChoiceId);
+            const correctChoice = q.choices ? q.choices.find(c => c.option_id === q.correct_option_id) : null;
+            const userChoice = q.choices ? q.choices.find(c => c.option_id === userChoiceId) : null;
 
             const card = document.createElement('div');
             card.className = 'review-question-card ' + (isCorrect ? 'rev-correct' : (isUnanswered ? 'rev-unanswered' : 'rev-wrong'));

@@ -102,7 +102,7 @@ const ScoringEngine = {
                 icon: '💪',
                 color: '#ef4444',
                 gradient: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                description: 'Do not give up! Review the study materials and retake the quest to master these competencies.',
+                description: 'Do not give up! Review the study materials and check your detailed answer analysis below.',
                 badgeClass: 'badge-practice'
             };
         }

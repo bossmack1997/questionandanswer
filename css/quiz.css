@@ -1279,3 +1279,29 @@
     border-color: rgba(239, 68, 68, 0.5);
     color: #fca5a5;
 }
+
+/* ==========================================================================
+   RESULT LOCK & DASHBOARD STYLES
+   ========================================================================== */
+.result-lock-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    background: #f0fdf4;
+    border: 1.5px solid #86efac;
+    color: #166534;
+    padding: 0.85rem 1.25rem;
+    border-radius: var(--radius-md, 12px);
+    margin: 1.25rem 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-align: center;
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+}
+
+.result-lock-banner .lock-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+

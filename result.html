@@ -33,6 +33,16 @@
           <span id="resStudentName" class="student-name-bold">Learner</span>! 🎉
         </p>
 
+        <!-- Completion Lock Banner -->
+        <div class="result-lock-banner" role="status">
+          <span class="lock-icon">🔒</span>
+          <div>
+            <strong>Status: Completed</strong> — Retaking this task or
+            assessment is not allowed. Your answers and score are securely
+            recorded.
+          </div>
+        </div>
+
         <!-- Final Score Hero Section -->
         <section class="final-score-banner" aria-label="Score Overview">
           <div class="score-banner-item">
@@ -158,11 +168,11 @@
             <span>🖨️ Print Certificate</span>
           </button>
           <a
-            href="index.html"
+            href="student.html"
             class="btn-launch btn-compact"
-            id="homePortalBtn"
+            id="backToDashboardBtn"
           >
-            <span>Home Portal</span>
+            <span>Back to Dashboard</span>
             <span>🏠</span>
           </a>
         </footer>
@@ -208,6 +218,7 @@
     </div>
 
     <!-- Scripts -->
+    <script src="js/auth.js"></script>
     <script src="js/config.js"></script>
     <script src="js/questions.js"></script>
     <script src="js/audio.js"></script>

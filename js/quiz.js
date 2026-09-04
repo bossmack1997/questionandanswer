@@ -113,19 +113,32 @@ class EnglishQuestEngine {
         this.setupAntiCheating();
         this.setupNetworkMonitoring();
 
-        // Synchronous initial load / restore
-        this.loadLocalQuestState();
+        // Check target task from URL query parameters (e.g. quiz.html?task=2)
+        const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
+        const requestedTask = urlParams ? parseInt(urlParams.get('task'), 10) : null;
+        if (requestedTask && requestedTask >= 1 && requestedTask <= 3) {
+            this.currentTask = requestedTask;
+        }
 
-        // Asynchronous cloud reconciliation
-        this.reconcileCloudQuestState();
-
-        this.startPeriodicSyncHeartbeat();
+        // Run strict pre-quiz verification with Firestore
+        this.verifyAndInitializeQuiz();
     }
 
     cacheDOM() {
         if (typeof document === "undefined") return;
 
         this.dom = {
+            // Overlays & Loaders
+            verificationLoader: document.getElementById('quizVerificationLoader'),
+            taskLockedModal: document.getElementById('taskLockedModal'),
+            lockedTaskHeading: document.getElementById('lockedTaskHeading'),
+            lockedTaskMessage: document.getElementById('lockedTaskMessage'),
+            lockedTaskScoreText: document.getElementById('lockedTaskScoreText'),
+            lockedTaskDateText: document.getElementById('lockedTaskDateText'),
+            lockedViewResultBtn: document.getElementById('lockedViewResultBtn'),
+            verificationErrorModal: document.getElementById('quizVerificationErrorModal'),
+            retryVerificationBtn: document.getElementById('retryVerificationBtn'),
+
             // HUD
             hudStudentName: document.getElementById('hudStudentName'),
             hudTaskBadge: document.getElementById('hudTaskBadge'),
@@ -420,6 +433,145 @@ class EnglishQuestEngine {
         }
     }
 
+    async verifyAndInitializeQuiz() {
+        if (this.dom && this.dom.verificationLoader) {
+            this.dom.verificationLoader.classList.remove('hidden');
+        }
+
+        try {
+            // Check submission records in Cloud Firestore
+            let submissions = {};
+            if (typeof window !== "undefined" && window.firebaseService) {
+                submissions = await window.firebaseService.getAllTaskSubmissionsForStudent(this.studentId);
+            }
+
+            // Also check local storage backups
+            [1, 2, 3].forEach(tNum => {
+                if (!submissions['task' + tNum]) {
+                    const localSub = localStorage.getItem('english10_task_submission_' + this.studentId + '_task' + tNum);
+                    if (localSub) {
+                        try { submissions['task' + tNum] = JSON.parse(localSub); } catch(e){}
+                    }
+                }
+            });
+
+            // If all 3 tasks are already submitted, lock entirely
+            const allDone = [1, 2, 3].every(tNum => Boolean(submissions['task' + tNum]));
+            if (allDone) {
+                if (this.dom && this.dom.verificationLoader) this.dom.verificationLoader.classList.add('hidden');
+                this.showTaskLockedScreen('all', {
+                    message: "You have already completed all tasks in this assessment. Retaking the quiz is not allowed.",
+                    title: "ASSESSMENT COMPLETED"
+                });
+                return;
+            }
+
+            // If the specific requested task is already submitted, lock that task
+            const targetTaskKey = 'task' + this.currentTask;
+            if (submissions[targetTaskKey]) {
+                if (this.dom && this.dom.verificationLoader) this.dom.verificationLoader.classList.add('hidden');
+                this.showTaskLockedScreen(this.currentTask, submissions[targetTaskKey]);
+                return;
+            }
+
+            // Sequential progression checks:
+            // If requested Task 2, but Task 1 is not submitted, route to Task 1
+            if (this.currentTask === 2 && !submissions['task1']) {
+                this.currentTask = 1;
+            }
+            // If requested Task 3, but Task 1 or Task 2 is not submitted, route to earliest uncompleted task
+            if (this.currentTask === 3) {
+                if (!submissions['task1']) {
+                    this.currentTask = 1;
+                } else if (!submissions['task2']) {
+                    this.currentTask = 2;
+                }
+            }
+
+            // Populate already submitted task scores into taskScores if any
+            [1, 2, 3].forEach(tNum => {
+                const sub = submissions['task' + tNum];
+                if (sub) {
+                    this.taskScores['task' + tNum] = {
+                        correct: sub.correctCount !== undefined ? sub.correctCount : (sub.score || 0),
+                        wrong: sub.wrongCount !== undefined ? sub.wrongCount : ((sub.totalQuestions || 10) - (sub.score || 0)),
+                        unanswered: sub.unansweredCount || 0,
+                        score: sub.score || 0,
+                        xp: sub.xp || (sub.score * 10),
+                        total: sub.totalQuestions || (tNum === 3 ? 12 : 10),
+                        completed: true
+                    };
+                }
+            });
+
+            // If verified, hide loader and proceed
+            if (this.dom && this.dom.verificationLoader) {
+                this.dom.verificationLoader.classList.add('hidden');
+            }
+
+            this.loadLocalQuestState();
+            await this.reconcileCloudQuestState();
+            this.startPeriodicSyncHeartbeat();
+
+        } catch (error) {
+            console.error("Verification check failed:", error);
+            if (this.dom && this.dom.verificationLoader) {
+                this.dom.verificationLoader.classList.add('hidden');
+            }
+
+            if (this.dom && this.dom.verificationErrorModal) {
+                this.dom.verificationErrorModal.classList.remove('hidden');
+                if (this.dom.retryVerificationBtn) {
+                    this.dom.retryVerificationBtn.onclick = () => {
+                        this.dom.verificationErrorModal.classList.add('hidden');
+                        this.verifyAndInitializeQuiz();
+                    };
+                }
+            } else {
+                this.loadLocalQuestState();
+            }
+        }
+    }
+
+    showTaskLockedScreen(taskNum, submission) {
+        if (!this.dom || !this.dom.taskLockedModal) return;
+
+        if (this.dom.lockedTaskHeading) {
+            this.dom.lockedTaskHeading.textContent = taskNum === 'all' ? "ASSESSMENT COMPLETED" : "TASK " + taskNum + " COMPLETED";
+        }
+        if (this.dom.lockedTaskMessage) {
+            this.dom.lockedTaskMessage.textContent = (submission && submission.message) 
+                ? submission.message 
+                : "You have already completed and submitted Task " + taskNum + ". Retaking this task is not allowed.";
+        }
+        if (this.dom.lockedTaskScoreText) {
+            if (submission && typeof submission.score === 'number') {
+                const total = submission.totalQuestions || (taskNum === 3 ? 12 : 10);
+                this.dom.lockedTaskScoreText.textContent = "Score: " + submission.score + " / " + total + " (" + (submission.xp || (submission.score * 10)) + " XP)";
+                this.dom.lockedTaskScoreText.style.display = 'block';
+            } else {
+                this.dom.lockedTaskScoreText.style.display = 'none';
+            }
+        }
+        if (this.dom.lockedTaskDateText) {
+            if (submission && submission.submittedAt) {
+                const d = new Date(submission.submittedAt);
+                this.dom.lockedTaskDateText.textContent = "Submitted on: " + d.toLocaleString();
+                this.dom.lockedTaskDateText.style.display = 'block';
+            } else {
+                this.dom.lockedTaskDateText.textContent = "Submitted securely to Teacher Records";
+            }
+        }
+        if (this.dom.lockedViewResultBtn) {
+            this.dom.lockedViewResultBtn.href = (taskNum === 'all') ? "result.html" : ("result.html?task=" + taskNum);
+        }
+
+        this.dom.taskLockedModal.classList.remove('hidden');
+        if (typeof window !== "undefined" && window.soundSystem) {
+            window.soundSystem.playTick();
+        }
+    }
+
     handleTaskTabClick(taskNum) {
         if (this.autoNextTimeout) clearTimeout(this.autoNextTimeout);
 
@@ -427,10 +579,17 @@ class EnglishQuestEngine {
             return;
         }
 
-        const targetCompleted = this.taskScores['task' + taskNum].completed;
-        const isPrevious = (taskNum < this.currentTask);
+        const targetCompleted = this.taskScores['task' + taskNum] && this.taskScores['task' + taskNum].completed;
 
-        if (isPrevious || targetCompleted) {
+        if (targetCompleted) {
+            this.showToastWarning('🔒 Task ' + taskNum + ' is already submitted and locked.');
+            return;
+        }
+
+        const isPrevious = (taskNum < this.currentTask);
+        const prevTaskCompleted = (taskNum === 1) || (this.taskScores['task' + (taskNum - 1)] && this.taskScores['task' + (taskNum - 1)].completed);
+
+        if (isPrevious || prevTaskCompleted) {
             this.currentTask = taskNum;
             this.currentQuestionIndex = 0;
             this.renderReadingSection('task' + taskNum);
@@ -1112,7 +1271,7 @@ class EnglishQuestEngine {
         }
     }
 
-    handleNextOrSubmitAction() {
+    async handleNextOrSubmitAction() {
         if (this.autoNextTimeout) clearTimeout(this.autoNextTimeout);
 
         const currentTaskTotal = this.taskQuestions['task' + this.currentTask].length;
@@ -1123,8 +1282,64 @@ class EnglishQuestEngine {
             this.saveState();
             if (typeof window !== "undefined" && window.soundSystem) window.soundSystem.playClick();
         } else {
-            this.taskScores['task' + this.currentTask].completed = true;
+            // Task completed - calculate task score and submit to Firestore
+            const taskNum = this.currentTask;
+            const taskKey = 'task' + taskNum;
+            this.recalculateLiveGamification();
+            this.taskScores[taskKey].completed = true;
+
+            const taskScoreData = this.taskScores[taskKey];
+            const taskAnswers = {};
+            (this.taskQuestions[taskKey] || []).forEach(q => {
+                if (this.answersMap[q.question_id]) {
+                    taskAnswers[q.question_id] = this.answersMap[q.question_id];
+                }
+            });
+
+            const taskSubmission = {
+                studentId: this.studentId,
+                studentName: this.studentName,
+                taskId: taskNum,
+                taskKey: taskKey,
+                attemptId: this.attemptId,
+                score: taskScoreData.score,
+                totalQuestions: taskScoreData.total,
+                correctCount: taskScoreData.correct,
+                wrongCount: taskScoreData.wrong,
+                unansweredCount: taskScoreData.unanswered,
+                xp: taskScoreData.xp,
+                submittedAt: new Date().toISOString(),
+                answers: taskAnswers,
+                questions: this.taskQuestions[taskKey]
+            };
+
+            // Disable button during submission
+            if (this.dom.nextBtn) {
+                this.dom.nextBtn.disabled = true;
+            }
+            if (this.dom.nextBtnText) {
+                this.dom.nextBtnText.textContent = "Saving Task " + taskNum + "... ⏳";
+            }
+
+            // Save locally
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem('english10_task_submission_' + this.studentId + '_task' + taskNum, JSON.stringify(taskSubmission));
+            }
+
+            // Save to Firestore
+            if (typeof window !== "undefined" && window.firebaseService) {
+                try {
+                    await window.firebaseService.saveTaskSubmission(taskSubmission);
+                } catch (e) {
+                    console.error("Error saving task " + taskNum + " submission to Firebase:", e);
+                }
+            }
+
             this.saveState();
+
+            if (this.dom.nextBtn) {
+                this.dom.nextBtn.disabled = false;
+            }
 
             if (this.currentTask < 3) {
                 this.showTaskCompletionMilestone(this.currentTask);
@@ -1265,6 +1480,11 @@ class EnglishQuestEngine {
         this.pauseTimer();
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
 
+        if (this.dom.confirmSubmitFinalQuestBtn) {
+            this.dom.confirmSubmitFinalQuestBtn.disabled = true;
+            this.dom.confirmSubmitFinalQuestBtn.innerHTML = '<span>Submitting Assessment... ⏳</span>';
+        }
+
         // Recalculate final score & breakdown authoritatively
         this.recalculateLiveGamification();
 
@@ -1295,12 +1515,15 @@ class EnglishQuestEngine {
             maxStreak: this.maxStreak,
             timeUsed: this.totalTimeUsed,
             autoSubmitted: isAutoSubmit || this.autoSubmitted,
-            attemptAudit: this.attemptAudit
+            attemptAudit: this.attemptAudit,
+            answersMap: this.answersMap,
+            completedAt: new Date().toISOString()
         };
 
         // Cache last result in localStorage & sessionStorage for result.html
         if (typeof localStorage !== "undefined") {
             localStorage.setItem('english10_last_result', JSON.stringify(resultPayload));
+            localStorage.setItem('english10_last_result_' + this.studentId, JSON.stringify(resultPayload));
             localStorage.removeItem('english10_quest_attempt_' + this.studentName);
             localStorage.removeItem('english10_active_attempt_' + this.studentId);
         }
@@ -1309,9 +1532,40 @@ class EnglishQuestEngine {
             sessionStorage.removeItem('english10_active_state');
         }
 
-        // Push to Firebase and cleanup active in-progress record
+        // Push all task submissions and final result to Firebase
         if (typeof window !== "undefined" && window.firebaseService) {
             try {
+                // Ensure each task submission is recorded
+                for (let tNum = 1; tNum <= 3; tNum++) {
+                    const taskKey = 'task' + tNum;
+                    const taskScoreData = this.taskScores[taskKey];
+                    const taskAnswers = {};
+                    (this.taskQuestions[taskKey] || []).forEach(q => {
+                        if (this.answersMap[q.question_id]) {
+                            taskAnswers[q.question_id] = this.answersMap[q.question_id];
+                        }
+                    });
+
+                    const taskSub = {
+                        studentId: this.studentId,
+                        studentName: this.studentName,
+                        taskId: tNum,
+                        taskKey: taskKey,
+                        attemptId: this.attemptId,
+                        score: taskScoreData.score,
+                        totalQuestions: taskScoreData.total,
+                        correctCount: taskScoreData.correct,
+                        wrongCount: taskScoreData.wrong,
+                        unansweredCount: taskScoreData.unanswered,
+                        xp: taskScoreData.xp,
+                        submittedAt: new Date().toISOString(),
+                        answers: taskAnswers,
+                        questions: this.taskQuestions[taskKey]
+                    };
+
+                    await window.firebaseService.saveTaskSubmission(taskSub);
+                }
+
                 await window.firebaseService.saveQuizResult(resultPayload);
             } catch (e) {
                 console.error("Error saving final result to Firebase:", e);
