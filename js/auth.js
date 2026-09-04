@@ -1,42 +1,44 @@
 /**
  * AUTH & STUDENT SESSION MANAGER — ENGLISH QUEST
- * Manages clean student sessions with unique stable identifiers
+ * Manages clean student sessions with unique stable identifiers based on Full Name & Section
  */
 
 const AuthManager = {
     SESSION_KEY: 'english_quest_student_session',
 
-    // Generate clean unique student ID
-    generateStudentId(name) {
-        const cleanName = (name || 'student').trim().toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 15);
-        const timestamp = Date.now().toString(36);
-        const randomHex = Math.random().toString(36).substring(2, 6);
-        return `STU_${cleanName}_${timestamp}_${randomHex}`;
+    // Generate deterministic clean unique student ID from Name + Section
+    generateStudentId(name, section = '') {
+        const cleanName = (name || 'student').trim().toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+        const cleanSec = (section || 'general').trim().toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+        return `student_${cleanName || 'anonymous'}_sec_${cleanSec || 'general'}`;
     },
 
-    // Initialize or retrieve student session
-    loginStudent(studentName) {
+    // Initialize or retrieve student session with Full Name and Section
+    loginStudent(studentName, studentSection = '') {
         if (!studentName || !studentName.trim()) {
             throw new Error('Student name is required.');
         }
 
         const trimmedName = studentName.trim();
-        const existingSession = this.getStudentSession();
-
-        // If same student name, preserve existing student ID
-        if (existingSession && existingSession.name.toLowerCase() === trimmedName.toLowerCase()) {
-            return existingSession;
-        }
+        const trimmedSection = (studentSection || '').trim() || 'Grade 10';
+        const studentId = this.generateStudentId(trimmedName, trimmedSection);
 
         const newSession = {
-            student_id: this.generateStudentId(trimmedName),
+            student_id: studentId,
+            studentId: studentId,
             name: trimmedName,
+            studentName: trimmedName,
+            section: trimmedSection,
+            studentSection: trimmedSection,
             logged_in_at: new Date().toISOString(),
             logged_in_at_ms: Date.now()
         };
 
         try {
             localStorage.setItem(this.SESSION_KEY, JSON.stringify(newSession));
+            localStorage.setItem('english10_student_name', trimmedName);
+            localStorage.setItem('english10_student_section', trimmedSection);
+            localStorage.setItem('english10_student_id', studentId);
         } catch (e) {
             console.error('[AuthManager] Session save error:', e);
         }
@@ -48,16 +50,38 @@ const AuthManager = {
     getStudentSession() {
         try {
             const raw = localStorage.getItem(this.SESSION_KEY);
-            return raw ? JSON.parse(raw) : null;
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.name) return parsed;
+            }
+            const fallbackName = localStorage.getItem('english10_student_name');
+            const fallbackSection = localStorage.getItem('english10_student_section') || 'Grade 10';
+            if (fallbackName) {
+                return {
+                    student_id: this.generateStudentId(fallbackName, fallbackSection),
+                    name: fallbackName,
+                    section: fallbackSection
+                };
+            }
+            return null;
         } catch (e) {
             return null;
         }
+    },
+
+    // Convenient getter for current student
+    getCurrentStudent() {
+        return this.getStudentSession();
     },
 
     // Logout / Clear session
     logout() {
         try {
             localStorage.removeItem(this.SESSION_KEY);
+            localStorage.removeItem('english10_student_name');
+            localStorage.removeItem('english10_student_section');
+            localStorage.removeItem('english10_student_id');
+            sessionStorage.removeItem('english10_active_state');
         } catch (e) {
             console.error('[AuthManager] Session clear error:', e);
         }
@@ -71,4 +95,5 @@ if (typeof window !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { AuthManager };
 }
+
 

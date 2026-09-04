@@ -33,6 +33,16 @@ class FirebaseService {
                     }
                     this.auth = firebase.auth();
                     this.db = firebase.firestore();
+
+                    // Enable offline persistence when supported
+                    if (typeof this.db.enablePersistence === 'function') {
+                        this.db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+                            if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+                                // Ignore benign multi-tab precondition errors
+                            }
+                        });
+                    }
+
                     this.initialized = true;
                     console.info('🔥 Firebase initialized successfully.');
                     return;
@@ -46,51 +56,135 @@ class FirebaseService {
 
     /**
      * Deterministic Student ID Generation
-     * Ensures consistent identification across devices, case-sensitivity, and spaces.
+     * Ensures consistent identification across devices, case-sensitivity, spaces, and sections.
      */
-    normalizeStudentId(name) {
+    normalizeStudentId(name, section = '') {
         if (!name || typeof name !== 'string') return 'student_anonymous';
-        const clean = name.trim().toLowerCase()
+        const cleanName = name.trim().toLowerCase()
             .replace(/[^a-z0-9]/g, '_')
             .replace(/_+/g, '_')
             .replace(/^_+|_+$/g, '');
-        return 'student_' + (clean || 'anonymous');
+        const cleanSec = (section || '').trim().toLowerCase()
+            .replace(/[^a-z0-9]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        return 'student_' + (cleanName || 'anonymous') + (cleanSec ? ('_sec_' + cleanSec) : '');
+    }
+
+    /**
+     * Register student active session in real-time for Teacher Monitoring.
+     */
+    async registerStudentSession(studentData) {
+        if (!studentData) return;
+        const sid = studentData.studentId || this.normalizeStudentId(studentData.studentName, studentData.studentSection);
+        const name = studentData.studentName || 'Student';
+        const section = studentData.studentSection || studentData.section || 'Grade 10';
+        const status = studentData.status || 'online';
+
+        const record = {
+            studentId: sid,
+            studentName: name,
+            studentSection: section,
+            status: status,
+            currentTask: studentData.currentTask || 1,
+            lastActive: new Date().toISOString(),
+            lastActiveMs: Date.now()
+        };
+
+        // Mirror to local list for offline / teacher backup
+        try {
+            const raw = localStorage.getItem('english10_active_students');
+            const list = raw ? JSON.parse(raw) : [];
+            const idx = list.findIndex(item => item.studentId === sid);
+            if (idx >= 0) {
+                list[idx] = { ...list[idx], ...record };
+            } else {
+                list.unshift(record);
+            }
+            localStorage.setItem('english10_active_students', JSON.stringify(list));
+        } catch (e) {}
+
+        // Push to Cloud Firestore collection 'active_students'
+        if (this.initialized && this.db) {
+            try {
+                await this.db.collection('active_students').doc(sid).set({
+                    ...record,
+                    serverUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch (err) {
+                // Silently fallback on offline
+            }
+        }
+    }
+
+    /**
+     * Retrieve all active / logged-in student sessions for Teacher Dashboard.
+     */
+    async getActiveStudents() {
+        if (this.initialized && this.db) {
+            try {
+                const fetchPromise = this.db.collection('active_students').get();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
+                const snapshot = await Promise.race([fetchPromise, timeoutPromise]);
+                const list = [];
+                snapshot.forEach(doc => {
+                    list.push({ id: doc.id, ...doc.data() });
+                });
+                if (list.length > 0) return list;
+            } catch (err) {
+                // Silently fallback
+            }
+        }
+
+        try {
+            const raw = localStorage.getItem('english10_active_students');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
     }
 
     /**
      * Get active in-progress attempt for a student across any device/browser.
      */
-    async getActiveAttempt(studentId, studentName) {
-        const id = studentId || this.normalizeStudentId(studentName);
+    async getActiveAttempt(studentId, studentName, studentSection = '') {
+        const id = studentId || this.normalizeStudentId(studentName, studentSection);
 
         // 1. Try Firestore First (Authoritative source across devices)
         if (this.initialized && this.db) {
             try {
-                const docSnap = await this.db.collection('active_attempts').doc(id).get();
-                if (docSnap.exists) {
+                const getPromise = this.db.collection('active_attempts').doc(id).get();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
+                const docSnap = await Promise.race([getPromise, timeoutPromise]);
+
+                if (docSnap && docSnap.exists) {
                     const data = docSnap.data();
                     if (data && data.status === 'in_progress') {
-                        // Mirror to local cache for responsiveness
-                        localStorage.setItem('english10_active_attempt_' + id, JSON.stringify(data));
+                        try {
+                            localStorage.setItem('english10_active_attempt_' + id, JSON.stringify(data));
+                        } catch (e) {}
                         return data;
                     }
                 }
             } catch (err) {
-                console.warn('[FirebaseService] Active attempt fetch note:', err.message);
+                // Silently fallback to local cache on offline / timeout
             }
         }
 
         // 2. Fallback to Local Storage Cache
-        const local = localStorage.getItem('english10_active_attempt_' + id) ||
-                      localStorage.getItem('english10_quest_attempt_' + studentName);
-        if (local) {
-            try {
-                const parsed = JSON.parse(local);
-                if (parsed && (!parsed.status || parsed.status === 'in_progress')) {
-                    return parsed;
-                }
-            } catch (e) {
-                console.warn('[FirebaseService] Corrupt local active attempt:', e);
+        const localKeys = [
+            'english10_active_attempt_' + id,
+            'english10_quest_attempt_' + (studentName || id)
+        ];
+        for (const k of localKeys) {
+            const local = localStorage.getItem(k);
+            if (local) {
+                try {
+                    const parsed = JSON.parse(local);
+                    if (parsed && (!parsed.status || parsed.status === 'in_progress')) {
+                        return parsed;
+                    }
+                } catch (e) {}
             }
         }
 
@@ -102,8 +196,9 @@ class FirebaseService {
      */
     async saveActiveAttempt(attemptData) {
         if (!attemptData) return false;
-        const studentId = attemptData.student_id || this.normalizeStudentId(attemptData.student_name || attemptData.studentName);
+        const studentId = attemptData.student_id || this.normalizeStudentId(attemptData.student_name || attemptData.studentName, attemptData.section || attemptData.studentSection);
         attemptData.student_id = studentId;
+        attemptData.section = attemptData.section || attemptData.studentSection || 'Grade 10';
         attemptData.status = 'in_progress';
         attemptData.last_activity_at = new Date().toISOString();
 
@@ -190,54 +285,65 @@ class FirebaseService {
         // 1. Try Firestore First (Authoritative source across devices)
         if (this.initialized && this.db) {
             try {
-                const docSnap = await this.db.collection('submissions').doc(docId).get();
-                if (docSnap.exists) {
+                const getPromise = this.db.collection('submissions').doc(docId).get();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
+                const docSnap = await Promise.race([getPromise, timeoutPromise]);
+
+                if (docSnap && docSnap.exists) {
                     const data = docSnap.data();
                     if (data && data.status === 'completed') {
-                        localStorage.setItem('english10_sub_' + docId, JSON.stringify(data));
+                        try {
+                            localStorage.setItem('english10_sub_' + docId, JSON.stringify(data));
+                        } catch (e) {}
                         return data;
                     }
                 }
-                return null;
             } catch (err) {
-                console.warn(`[FirebaseService] Firestore task submission query error for ${docId}:`, err.message);
-                throw err;
+                // Silently handle expected offline/timeout states without throwing
             }
         }
 
-        // 2. Fallback to local cache only if Firestore is not initialized
-        const local = localStorage.getItem('english10_sub_' + docId) ||
-                      localStorage.getItem('english10_sub_' + sid + '_' + tNum);
-        if (local) {
-            try {
-                const parsed = JSON.parse(local);
-                if (parsed && parsed.status === 'completed') {
-                    return parsed;
-                }
-            } catch (e) {}
+        // 2. Fallback to Local Storage Cache
+        const localKeys = [
+            `english10_sub_${docId}`,
+            `english10_task_submission_${sid}_task${tNum}`,
+            `english10_sub_${sid}_${tNum}`
+        ];
+        for (const k of localKeys) {
+            const local = localStorage.getItem(k);
+            if (local) {
+                try {
+                    const parsed = JSON.parse(local);
+                    if (parsed && (parsed.status === 'completed' || typeof parsed.score === 'number')) {
+                        return parsed;
+                    }
+                } catch (e) {}
+            }
         }
 
         return null;
     }
 
     /**
-     * Retrieve all completed task submissions for student (Tasks 1, 2, 3, 4).
+     * Retrieve all completed task submissions for student (Tasks 1, 2, 3).
      */
     async getAllTaskSubmissionsForStudent(studentId) {
         const sid = studentId || 'student_anonymous';
-        const results = { 1: null, 2: null, 3: null, 4: null };
+        const results = { 
+            1: null, 2: null, 3: null,
+            task1: null, task2: null, task3: null
+        };
 
-        for (let t = 1; t <= 4; t++) {
+        for (let t = 1; t <= 3; t++) {
+            let sub = null;
             try {
-                results[t] = await this.getTaskSubmission(sid, t);
+                sub = await this.getTaskSubmission(sid, t);
             } catch (err) {
-                console.warn(`[FirebaseService] Error checking task ${t} submission for ${sid}:`, err.message);
-                // Check local cache if network error
-                const localSub = localStorage.getItem(`english10_sub_${sid}_task${t}`);
-                if (localSub) {
-                    try { results[t] = JSON.parse(localSub); } catch(e){}
-                }
+                // Fallback handled inside getTaskSubmission
             }
+
+            results[t] = sub;
+            results['task' + t] = sub;
         }
 
         return results;
@@ -249,7 +355,8 @@ class FirebaseService {
     async saveTaskSubmission(taskData) {
         if (!taskData) throw new Error('Submission data is missing.');
 
-        const sid = taskData.studentId || this.normalizeStudentId(taskData.studentName);
+        const section = taskData.section || taskData.studentSection || localStorage.getItem('english10_student_section') || 'Grade 10';
+        const sid = taskData.studentId || this.normalizeStudentId(taskData.studentName, section);
         const tNum = parseInt(taskData.taskId, 10) || 1;
         const docId = `${sid}_task${tNum}`;
 
@@ -261,6 +368,8 @@ class FirebaseService {
         const payload = {
             studentId: sid,
             studentName: taskData.studentName || 'Student',
+            section: section,
+            studentSection: section,
             taskId: tNum,
             status: 'completed',
             score: score,
@@ -303,11 +412,10 @@ class FirebaseService {
 
                 console.info(`[FirebaseService] Task ${tNum} submission saved atomically to Firestore: ${docId}`);
             } catch (err) {
-                console.error(`[FirebaseService] Firestore transaction error for ${docId}:`, err);
-                throw new Error("We couldn't verify your quiz status. Please check your connection and try again.");
+                console.warn(`[FirebaseService] Firestore transaction notice for ${docId} (saved locally):`, err.message);
             }
         } else {
-            console.warn('[FirebaseService] Firestore not initialized during saveTaskSubmission.');
+            console.info('[FirebaseService] Local storage used for saveTaskSubmission (Firestore offline or unconfigured).');
         }
 
         return payload;
@@ -318,7 +426,8 @@ class FirebaseService {
      * and atomically persist each task's submission record (Tasks 1..4).
      */
     async saveQuizResult(data) {
-        const studentId = data.studentId || data.student_id || this.normalizeStudentId(data.studentName || data.student_name);
+        const section = data.section || data.studentSection || data.student_section || localStorage.getItem('english10_student_section') || 'Grade 10';
+        const studentId = data.studentId || data.student_id || this.normalizeStudentId(data.studentName || data.student_name, section);
         const studentName = data.studentName || data.student_name || "Anonymous";
 
         const answersMap = data.answersMap || (data.attemptAudit && data.attemptAudit.selected_answers) || {};
@@ -326,23 +435,20 @@ class FirebaseService {
         const t1Total = 10;
         const t2Total = 10;
         const t3Total = 12;
-        const t4Total = 10;
-        const totalOverallQuestions = 42;
+        const totalOverallQuestions = 32;
 
         const t1Score = (typeof data.task1Score === 'number') ? data.task1Score : (data.task1Correct || 0);
         const t2Score = (typeof data.task2Score === 'number') ? data.task2Score : (data.task2Correct || 0);
         const t3Score = (typeof data.task3Score === 'number') ? data.task3Score : (data.task3Correct || 0);
-        const t4Score = (typeof data.task4Score === 'number') ? data.task4Score : (data.task4Correct || 0);
 
-        const totalScore = (typeof data.totalScore === 'number') ? data.totalScore : (t1Score + t2Score + t3Score + t4Score);
+        const totalScore = (typeof data.totalScore === 'number') ? data.totalScore : (t1Score + t2Score + t3Score);
         const percentage = typeof data.percentage === 'number' ? Number(data.percentage.toFixed(2)) : Number(((totalScore / totalOverallQuestions) * 100).toFixed(2));
 
         // Atomically ensure each task submission is recorded
         const taskScoresArray = [
             { taskId: 1, score: t1Score, total: t1Total },
             { taskId: 2, score: t2Score, total: t2Total },
-            { taskId: 3, score: t3Score, total: t3Total },
-            { taskId: 4, score: t4Score, total: t4Total }
+            { taskId: 3, score: t3Score, total: t3Total }
         ];
 
         for (const tInfo of taskScoresArray) {
@@ -350,6 +456,8 @@ class FirebaseService {
                 await this.saveTaskSubmission({
                     studentId: studentId,
                     studentName: studentName,
+                    section: section,
+                    studentSection: section,
                     taskId: tInfo.taskId,
                     score: tInfo.score,
                     totalQuestions: tInfo.total,
@@ -366,6 +474,8 @@ class FirebaseService {
         const payload = {
             studentName: studentName,
             studentId: studentId,
+            section: section,
+            studentSection: section,
             attemptId: data.attemptId || data.attempt_id || ('quest_' + Date.now()),
 
             task1Score: t1Score,
@@ -382,11 +492,6 @@ class FirebaseService {
             task3Correct: data.task3Correct !== undefined ? data.task3Correct : t3Score,
             task3Wrong: data.task3Wrong !== undefined ? data.task3Wrong : (t3Total - t3Score),
             task3Unanswered: data.task3Unanswered || 0,
-
-            task4Score: t4Score,
-            task4Correct: data.task4Correct !== undefined ? data.task4Correct : t4Score,
-            task4Wrong: data.task4Wrong !== undefined ? data.task4Wrong : (t4Total - t4Score),
-            task4Unanswered: data.task4Unanswered || 0,
 
             totalScore: totalScore,
             totalQuestions: totalOverallQuestions,
@@ -414,8 +519,7 @@ class FirebaseService {
                 console.info('[FirebaseService] Quiz result saved to Firestore with ID:', docRef.id);
                 payload.id = docRef.id;
             } catch (err) {
-                console.error('[FirebaseService] Error saving quiz_results to Firestore:', err);
-                throw new Error("Failed to save final quiz result to database. Please check your connection.");
+                console.warn('[FirebaseService] Quiz result saved locally (Firestore write notice):', err.message);
             }
         }
 
@@ -431,7 +535,10 @@ class FirebaseService {
     async getAllResults() {
         if (this.initialized && this.db) {
             try {
-                const snapshot = await this.db.collection('quiz_results').orderBy('completedAt', 'desc').get();
+                const fetchPromise = this.db.collection('quiz_results').orderBy('completedAt', 'desc').get();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
+                const snapshot = await Promise.race([fetchPromise, timeoutPromise]);
+
                 const list = [];
                 snapshot.forEach(doc => {
                     const d = doc.data();
@@ -449,7 +556,7 @@ class FirebaseService {
                 });
                 return list;
             } catch (err) {
-                console.warn('[FirebaseService] Firestore results query note, checking fallback:', err);
+                // Silently fallback to local list on offline or timeout
             }
         }
 

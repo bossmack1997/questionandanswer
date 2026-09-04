@@ -7,22 +7,27 @@
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Identify student
     let studentName = '';
+    let studentSection = '';
     let studentId = '';
 
     if (window.AuthManager && typeof window.AuthManager.getCurrentStudent === 'function') {
         const authData = window.AuthManager.getCurrentStudent();
         if (authData) {
             studentName = authData.name;
+            studentSection = authData.section;
             studentId = authData.id;
         }
     }
 
     if (!studentName) {
-        studentName = localStorage.getItem('studentName') || sessionStorage.getItem('studentName') || '';
+        studentName = localStorage.getItem('english10_student_name') || localStorage.getItem('studentName') || sessionStorage.getItem('studentName') || '';
+    }
+    if (!studentSection) {
+        studentSection = localStorage.getItem('english10_student_section') || sessionStorage.getItem('english10_student_section') || '';
     }
 
     if (window.firebaseService && studentName) {
-        studentId = window.firebaseService.normalizeStudentId(studentName);
+        studentId = window.firebaseService.normalizeStudentId(studentName, studentSection);
     } else if (studentName) {
         studentId = 'student_' + studentName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
     }
@@ -51,19 +56,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!result && studentId && window.firebaseService) {
         try {
             const submissions = await window.firebaseService.getAllTaskSubmissionsForStudent(studentId);
-            if (submissions && (submissions.task1 || submissions.task2 || submissions.task3 || submissions.task4)) {
+            if (submissions && (submissions.task1 || submissions.task2 || submissions.task3)) {
                 const t1 = submissions.task1 || {};
                 const t2 = submissions.task2 || {};
                 const t3 = submissions.task3 || {};
-                const t4 = submissions.task4 || {};
 
                 const t1Score = t1.score || 0;
                 const t2Score = t2.score || 0;
                 const t3Score = t3.score || 0;
-                const t4Score = t4.score || 0;
-                const totalScore = t1Score + t2Score + t3Score + t4Score;
+                const totalScore = t1Score + t2Score + t3Score;
 
-                const combinedAnswers = Object.assign({}, t1.answers || {}, t2.answers || {}, t3.answers || {}, t4.answers || {});
+                const combinedAnswers = Object.assign({}, t1.answers || {}, t2.answers || {}, t3.answers || {});
 
                 result = {
                     studentName: studentName,
@@ -83,18 +86,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     task3Wrong: t3.wrongCount !== undefined ? t3.wrongCount : (12 - t3Score),
                     task3Unanswered: t3.unansweredCount || 0,
 
-                    task4Score: t4Score,
-                    task4Correct: t4.correctCount !== undefined ? t4.correctCount : t4Score,
-                    task4Wrong: t4.wrongCount !== undefined ? t4.wrongCount : (10 - t4Score),
-                    task4Unanswered: t4.unansweredCount || 0,
-
                     totalScore: totalScore,
-                    totalQuestions: 42,
-                    percentage: Number(((totalScore / 42) * 100).toFixed(2)),
+                    totalQuestions: 32,
+                    percentage: Number(((totalScore / 32) * 100).toFixed(2)),
                     earnedXP: totalScore * 10,
                     maxStreak: 5,
                     timeUsed: 0,
-                    completedAt: t4.submittedAt || t3.submittedAt || t2.submittedAt || t1.submittedAt || new Date().toISOString(),
+                    completedAt: t3.submittedAt || t2.submittedAt || t1.submittedAt || new Date().toISOString(),
                     answersMap: combinedAnswers
                 };
             }
@@ -115,6 +113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 2. Cache DOM Elements
     const dom = {
         studentName: document.getElementById('resStudentName'),
+        studentSection: document.getElementById('resStudentSection'),
         finalScore: document.getElementById('resFinalScore'),
         percentage: document.getElementById('resPercentage'),
         earnedXP: document.getElementById('resEarnedXP'),
@@ -128,8 +127,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         task2Details: document.getElementById('resTask2Details'),
         task3Score: document.getElementById('resTask3Score'),
         task3Details: document.getElementById('resTask3Details'),
-        task4Score: document.getElementById('resTask4Score'),
-        task4Details: document.getElementById('resTask4Details'),
 
         totalCorrect: document.getElementById('resTotalCorrect'),
         totalWrong: document.getElementById('resTotalWrong'),
@@ -149,9 +146,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 3. Populate Results with count-up animations
     if (dom.studentName) dom.studentName.textContent = result.studentName || studentName || 'Learner';
+    if (dom.studentSection) dom.studentSection.textContent = result.section || result.studentSection || studentSection || 'Grade 10';
     
     const totalScore = (typeof result.totalScore === 'number') ? result.totalScore : 0;
-    const totalQuestions = result.totalQuestions || 42;
+    const totalQuestions = result.totalQuestions || 32;
     const pct = typeof result.percentage === 'number' ? result.percentage : Number(((totalScore / totalQuestions) * 100).toFixed(2));
     const xp = (typeof result.earnedXP === 'number') ? result.earnedXP : (totalScore * 10);
     const streak = result.maxStreak || 0;
@@ -169,12 +167,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const t1Score = (typeof result.task1Score === 'number') ? result.task1Score : (result.task1Correct || 0);
     const t2Score = (typeof result.task2Score === 'number') ? result.task2Score : (result.task2Correct || 0);
     const t3Score = (typeof result.task3Score === 'number') ? result.task3Score : (result.task3Correct || 0);
-    const t4Score = (typeof result.task4Score === 'number') ? result.task4Score : (result.task4Correct || 0);
 
     const t1Wrong = (typeof result.task1Wrong === 'number') ? result.task1Wrong : (10 - t1Score);
     const t2Wrong = (typeof result.task2Wrong === 'number') ? result.task2Wrong : (10 - t2Score);
     const t3Wrong = (typeof result.task3Wrong === 'number') ? result.task3Wrong : (12 - t3Score);
-    const t4Wrong = (typeof result.task4Wrong === 'number') ? result.task4Wrong : (10 - t4Score);
 
     if (dom.task1Score) dom.task1Score.textContent = t1Score + ' / 10';
     if (dom.task1Details) dom.task1Details.textContent = t1Score + ' Correct • ' + t1Wrong + ' Wrong';
@@ -184,9 +180,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (dom.task3Score) dom.task3Score.textContent = t3Score + ' / 12';
     if (dom.task3Details) dom.task3Details.textContent = t3Score + ' Correct • ' + t3Wrong + ' Wrong';
-
-    if (dom.task4Score) dom.task4Score.textContent = t4Score + ' / 10';
-    if (dom.task4Details) dom.task4Details.textContent = t4Score + ' Correct • ' + t4Wrong + ' Wrong';
 
     // 6. Summary Stats
     const totalCorrect = totalScore;
@@ -288,7 +281,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const allQuestions = [];
 
         // Aggregate questions from master bank
-        const taskKeys = filterTask ? ['task' + filterTask] : ['task1', 'task2', 'task3', 'task4'];
+        const taskKeys = filterTask ? ['task' + filterTask] : ['task1', 'task2', 'task3'];
         taskKeys.forEach(taskKey => {
             if (typeof masterQuestionBank !== 'undefined' && masterQuestionBank[taskKey]) {
                 allQuestions.push(...masterQuestionBank[taskKey]);

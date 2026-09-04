@@ -42,17 +42,18 @@
 
         <h1 class="entry-title">👋 WELCOME, LEARNER!</h1>
         <p class="entry-subtitle">
-          Enter your name to begin your English 10 Term 1 learning adventure:
+          Enter your Full Name and Section to unlock your individual quest
+          dashboard:
         </p>
 
         <form id="studentNameForm" class="name-form" novalidate>
           <div class="input-group">
-            <span class="input-icon">✏️</span>
+            <span class="input-icon">👤</span>
             <input
               type="text"
               id="studentNameInput"
               class="name-input"
-              placeholder="Enter your full name..."
+              placeholder="Enter your full name (e.g. Juan Dela Cruz)..."
               maxlength="50"
               required
               autofocus
@@ -60,18 +61,38 @@
               aria-label="Student Full Name"
             />
           </div>
+
+          <div class="input-group" style="margin-top: 12px">
+            <span class="input-icon">🏫</span>
+            <input
+              type="text"
+              id="studentSectionInput"
+              class="name-input"
+              placeholder="Enter your section (e.g. 10 - Rizal, Grade 10 - Diamond)..."
+              maxlength="50"
+              required
+              autocomplete="section"
+              aria-label="Student Section"
+            />
+          </div>
+
           <p id="nameError" class="input-error hidden" role="alert">
-            Please enter your name (at least 2 characters).
+            Please enter your full name and section.
           </p>
 
-          <button type="submit" id="nameSubmitBtn" class="btn-launch">
-            <span>ENTER QUEST</span>
+          <button
+            type="submit"
+            id="nameSubmitBtn"
+            class="btn-launch"
+            style="margin-top: 16px"
+          >
+            <span>ENTER QUEST DASHBOARD</span>
             <span>🚀</span>
           </button>
         </form>
       </main>
 
-      <!-- Screen 2: Game Start Screen & Quest Map (Shows after name entered) -->
+      <!-- Screen 2: Game Start Screen & Quest Map (Shows after name & section entered) -->
       <main id="challengeReadyCard" class="entry-card hidden">
         <div class="avatar-header">
           <div class="animated-avatar" id="briefingAvatar">🌟</div>
@@ -85,6 +106,38 @@
           <span id="welcomeStudentName" class="highlight-name">Learner</span>!
           👋
         </h1>
+        <div
+          class="student-meta-badges"
+          style="
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+          "
+        >
+          <span
+            id="welcomeStudentSection"
+            class="badge-role"
+            style="
+              background: rgba(99, 102, 241, 0.15);
+              color: #818cf8;
+              border: 1px solid rgba(99, 102, 241, 0.3);
+            "
+            >🏫 Section: 10 - Rizal</span
+          >
+          <span
+            id="welcomeStudentIdBadge"
+            class="badge-role"
+            style="
+              background: rgba(16, 185, 129, 0.15);
+              color: #34d399;
+              border: 1px solid rgba(16, 185, 129, 0.3);
+              font-family: monospace;
+            "
+            >🆔 ID: student_...</span
+          >
+        </div>
         <p class="entry-subtitle" id="briefingSubtitle">
           English 10 • Term 1 Objective Remediation Challenge
         </p>
@@ -106,7 +159,7 @@
               <span class="attempt-stat-lbl">Current Stage</span>
             </div>
             <div class="attempt-stat">
-              <span class="attempt-stat-val" id="resumeProgress">0 / 42</span>
+              <span class="attempt-stat-val" id="resumeProgress">0 / 32</span>
               <span class="attempt-stat-lbl">Answered</span>
             </div>
             <div class="attempt-stat">
@@ -114,7 +167,7 @@
               <span class="attempt-stat-lbl">Earned XP</span>
             </div>
             <div class="attempt-stat">
-              <span class="attempt-stat-val" id="resumeTimeLeft">42:00</span>
+              <span class="attempt-stat-val" id="resumeTimeLeft">32:00</span>
               <span class="attempt-stat-lbl">Time Left</span>
             </div>
           </div>
@@ -124,22 +177,22 @@
         <div class="quest-specs-grid" id="questSpecsGrid">
           <div class="spec-card">
             <span class="spec-icon">🎯</span>
-            <span class="spec-val">4 Tasks</span>
+            <span class="spec-val">3 Tasks</span>
             <span class="spec-lbl">Quest Chapters</span>
           </div>
           <div class="spec-card">
             <span class="spec-icon">📝</span>
-            <span class="spec-val">42 Questions</span>
+            <span class="spec-val">32 Questions</span>
             <span class="spec-lbl">Total Items</span>
           </div>
           <div class="spec-card">
             <span class="spec-icon">⭐</span>
-            <span class="spec-val">420 XP</span>
+            <span class="spec-val">320 XP</span>
             <span class="spec-lbl">Max Score</span>
           </div>
           <div class="spec-card">
             <span class="spec-icon">⏱️</span>
-            <span class="spec-val">42 Mins</span>
+            <span class="spec-val">32 Mins</span>
             <span class="spec-lbl">Challenge Timer</span>
           </div>
         </div>
@@ -205,7 +258,7 @@
                     Language, Style, Cohesion & Culture
                   </h4>
                   <span class="step-status-tag status-locked" id="mapStepTag3"
-                    >🔒 UNLOCKS NEXT</span
+                    >🔒 FINAL STAGE</span
                   >
                 </div>
                 <p class="step-desc" id="mapStepDesc3">
@@ -214,26 +267,6 @@
                 <div class="step-score-info hidden" id="mapStepScore3"></div>
               </div>
               <div class="step-action-col" id="mapStepAction3"></div>
-            </div>
-
-            <div class="map-connector">↓</div>
-
-            <!-- Step 4 -->
-            <div class="map-step-card step-locked" id="mapStep4" data-task="4">
-              <div class="step-badge">4</div>
-              <div class="step-info">
-                <div class="step-header">
-                  <h4 class="step-title">Synthesizing & Expressing Insights</h4>
-                  <span class="step-status-tag status-locked" id="mapStepTag4"
-                    >🔒 FINAL STAGE</span
-                  >
-                </div>
-                <p class="step-desc" id="mapStepDesc4">
-                  10 Questions • Synthesizing Texts, Evidence & Critical Claims
-                </p>
-                <div class="step-score-info hidden" id="mapStepScore4"></div>
-              </div>
-              <div class="step-action-col" id="mapStepAction4"></div>
             </div>
           </div>
 
@@ -261,7 +294,7 @@
         <!-- Action Buttons -->
         <div class="start-actions-bar" id="startActionsBar">
           <button type="button" id="changeNameBtn" class="btn-secondary-action">
-            <span>✏️ Change Name</span>
+            <span>🔄 Switch Student / Logout</span>
           </button>
           <button
             type="button"

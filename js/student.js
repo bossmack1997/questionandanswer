@@ -1,176 +1,330 @@
 /**
- * STUDENT ENTRY & QUEST BRIEFING CONTROLLER (WITH MULTI-DEVICE RESUME DETECTION)
- * Handles name input, validation, active Firestore/LocalStorage attempt check,
- * and seamless continuation or fresh start.
+ * STUDENT DASHBOARD & QUEST BRIEFING CONTROLLER
+ * Handles student Full Name & Section authentication, individual learner dashboard,
+ * instant local briefing rendering, and non-blocking background Firestore sync.
  */
 
-document.addEventListener('DOMContentLoaded', async () => {
-    const nameForm = document.getElementById('studentNameForm');
-    const nameInput = document.getElementById('studentNameInput');
-    const nameError = document.getElementById('nameError');
+document.addEventListener('DOMContentLoaded', () => {
+    // DOM Elements
     const nameEntryCard = document.getElementById('nameEntryCard');
     const challengeReadyCard = document.getElementById('challengeReadyCard');
-    const welcomeStudentName = document.getElementById('welcomeStudentName');
-    const startChallengeBtn = document.getElementById('startChallengeBtn');
-    const startBtnText = document.getElementById('startBtnText');
-    const startBtnIcon = document.getElementById('startBtnIcon');
-    const changeNameBtn = document.getElementById('changeNameBtn');
-    const startOverBtn = document.getElementById('startOverBtn');
+    const studentNameForm = document.getElementById('studentNameForm');
+    const studentNameInput = document.getElementById('studentNameInput');
+    const studentSectionInput = document.getElementById('studentSectionInput');
+    const nameError = document.getElementById('nameError');
+    const nameSubmitBtn = document.getElementById('nameSubmitBtn');
 
-    // Resume elements
+    const welcomeStudentName = document.getElementById('welcomeStudentName');
+    const welcomeStudentSection = document.getElementById('welcomeStudentSection');
+    const welcomeStudentIdBadge = document.getElementById('welcomeStudentIdBadge');
+    const briefingSubtitle = document.getElementById('briefingSubtitle');
     const activeAttemptBanner = document.getElementById('activeAttemptBanner');
     const resumeTaskName = document.getElementById('resumeTaskName');
     const resumeProgress = document.getElementById('resumeProgress');
     const resumeXP = document.getElementById('resumeXP');
     const resumeTimeLeft = document.getElementById('resumeTimeLeft');
 
+    const startActionsBar = document.getElementById('startActionsBar');
+    const changeNameBtn = document.getElementById('changeNameBtn');
+    const startOverBtn = document.getElementById('startOverBtn');
+    const startChallengeBtn = document.getElementById('startChallengeBtn');
+    const startBtnText = document.getElementById('startBtnText');
+    const startBtnIcon = document.getElementById('startBtnIcon');
+    const allTasksCompletedBox = document.getElementById('allTasksCompletedBox');
+
+    // Local State
+    let currentStudentName = '';
+    let currentStudentSection = '';
+    let currentStudentId = '';
     let activeAttemptData = null;
     let studentSubmissions = { 1: null, 2: null, 3: null, 4: null };
 
-    // Check if name already stored in session
-    const existingName = localStorage.getItem('studentName') || sessionStorage.getItem('studentName');
-    if (existingName && existingName.trim().length >= 2) {
-        nameInput.value = existingName;
-        await checkAndShowBriefing(existingName);
+    console.info('[Student] Controller initialized.');
+
+    // Helper: Normalize Student ID
+    function getStudentId(name, section) {
+        if (window.AuthManager && typeof window.AuthManager.generateStudentId === 'function') {
+            return window.AuthManager.generateStudentId(name, section);
+        }
+        if (window.firebaseService && typeof window.firebaseService.normalizeStudentId === 'function') {
+            return window.firebaseService.normalizeStudentId(name, section);
+        }
+        const cleanName = (name || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const cleanSec = (section || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+        return `student_${cleanName || 'anonymous'}_sec_${cleanSec || 'general'}`;
     }
 
-    if (nameForm) {
-        nameForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const rawName = nameInput.value.trim();
-
-            // Validation: Name cannot be empty and minimum 2 characters
-            if (!rawName || rawName.length < 2) {
-                showError('Please enter your name (at least 2 characters).');
-                nameInput.focus();
-                return;
-            }
-
-            if (rawName.length > 50) {
-                showError('Name is too long. Please use 50 characters or less.');
-                nameInput.focus();
-                return;
-            }
-
-            // Sanitize against HTML injection
-            const cleanName = rawName.replace(/[<>]/g, '');
-
-            // Store active session locally & in AuthManager
-            if (typeof AuthManager !== 'undefined') {
-                AuthManager.loginStudent(cleanName);
-            }
-            localStorage.setItem('studentName', cleanName);
-            sessionStorage.setItem('studentName', cleanName);
-
-            await checkAndShowBriefing(cleanName);
-        });
+    // Helper: Check if a task is completed
+    function isTaskCompleted(sub) {
+        if (!sub) return false;
+        if (sub.status === 'completed') return true;
+        if (typeof sub.score === 'number' && sub.score >= 0) return true;
+        return false;
     }
 
-    if (changeNameBtn) {
-        changeNameBtn.addEventListener('click', () => {
-            challengeReadyCard.classList.add('hidden');
-            nameEntryCard.classList.remove('hidden');
-            hideError();
-            nameInput.focus();
-        });
+    // Helper: Determine next uncompleted task (1, 2, 3)
+    function determineNextTask(submissions) {
+        const s = submissions || {};
+        for (let t = 1; t <= 3; t++) {
+            const sub = s[t] || s['task' + t];
+            if (!isTaskCompleted(sub)) {
+                return t;
+            }
+        }
+        return 4; // All 3 completed
     }
 
-    if (startOverBtn) {
-        startOverBtn.addEventListener('click', async () => {
-            if (confirm('Start a fresh quest for in-progress tasks? Completed tasks will remain permanently locked.')) {
-                const currentName = localStorage.getItem('studentName') || sessionStorage.getItem('studentName');
-                if (currentName) {
-                    const studentId = window.firebaseService ? window.firebaseService.normalizeStudentId(currentName) : ('student_' + currentName.toLowerCase().replace(/[^a-z0-9]/g, '_'));
-                    if (window.firebaseService) {
-                        await window.firebaseService.deleteActiveAttempt(studentId, currentName);
+    // Helper: Check if all tasks are complete
+    function allTasksCompleted(submissions) {
+        return determineNextTask(submissions) > 3;
+    }
+
+    // Bind Event Listeners Synchronously
+    function bindEvents() {
+        // 1. Student Full Name & Section Form Submit
+        if (studentNameForm) {
+            studentNameForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const rawName = studentNameInput ? studentNameInput.value.trim() : '';
+                const rawSection = studentSectionInput ? studentSectionInput.value.trim() : '';
+                const cleanName = rawName.replace(/[<>]/g, '').trim();
+                const cleanSection = rawSection.replace(/[<>]/g, '').trim();
+
+                if (cleanName.length < 2) {
+                    showError('Please enter your full name (at least 2 characters).');
+                    if (studentNameInput) studentNameInput.focus();
+                    return;
+                }
+
+                if (cleanName.length > 50) {
+                    showError('Full name cannot exceed 50 characters.');
+                    if (studentNameInput) studentNameInput.focus();
+                    return;
+                }
+
+                if (cleanSection.length < 1) {
+                    showError('Please enter your Section (e.g. 10 - Rizal, Grade 10 - Diamond).');
+                    if (studentSectionInput) studentSectionInput.focus();
+                    return;
+                }
+
+                hideError();
+                currentStudentName = cleanName;
+                currentStudentSection = cleanSection;
+                currentStudentId = getStudentId(cleanName, cleanSection);
+
+                console.info('[Student] Name & Section submitted:', currentStudentName, '| Section:', currentStudentSection, '| ID:', currentStudentId);
+
+                // Save to AuthManager / LocalStorage safely
+                try {
+                    if (window.AuthManager && typeof window.AuthManager.loginStudent === 'function') {
+                        window.AuthManager.loginStudent(currentStudentName, currentStudentSection);
+                    } else {
+                        localStorage.setItem('english10_student_name', currentStudentName);
+                        localStorage.setItem('english10_student_section', currentStudentSection);
+                        localStorage.setItem('english10_student_id', currentStudentId);
                     }
-                    localStorage.removeItem('english10_quest_attempt_' + currentName);
-                    localStorage.removeItem('english10_active_attempt_' + studentId);
+                } catch (err) {
+                    console.warn('[Student] Auth login storage notice:', err);
+                }
+
+                // Register student active session in Firebase (for teacher visibility)
+                if (window.firebaseService && typeof window.firebaseService.registerStudentSession === 'function') {
+                    window.firebaseService.registerStudentSession({
+                        studentId: currentStudentId,
+                        studentName: currentStudentName,
+                        studentSection: currentStudentSection,
+                        status: 'online',
+                        lastActive: new Date().toISOString()
+                    }).catch(() => {});
+                }
+
+                // Show briefing screen immediately
+                await checkAndShowBriefing(currentStudentName, currentStudentSection);
+            });
+        }
+
+        // 2. Start / Resume Challenge Button
+        if (startChallengeBtn) {
+            startChallengeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.info('[Student] Start button clicked.');
+
+                if (!currentStudentName) {
+                    currentStudentName = (studentNameInput ? studentNameInput.value.trim() : '') ||
+                                         localStorage.getItem('english10_student_name') || 'Student';
+                }
+                if (!currentStudentSection) {
+                    currentStudentSection = (studentSectionInput ? studentSectionInput.value.trim() : '') ||
+                                            localStorage.getItem('english10_student_section') || 'Grade 10';
+                }
+                currentStudentId = getStudentId(currentStudentName, currentStudentSection);
+
+                // Check if active in-progress attempt exists
+                if (activeAttemptData && activeAttemptData.currentTask && !isTaskCompleted(studentSubmissions[activeAttemptData.currentTask])) {
+                    const taskNum = activeAttemptData.currentTask || 1;
+                    console.info(`[Student] Resuming active task ${taskNum}...`);
+                    window.location.href = `quiz.html?task=${taskNum}`;
+                    return;
+                }
+
+                // Determine next sequential uncompleted task
+                const nextTask = determineNextTask(studentSubmissions);
+                if (nextTask > 3) {
+                    console.info('[Student] All tasks completed, navigating to result.html');
+                    window.location.href = 'result.html';
+                    return;
+                }
+
+                console.info(`[Student] Navigating to quiz.html?task=${nextTask}`);
+                window.location.href = `quiz.html?task=${nextTask}`;
+            });
+        }
+
+        // 3. Switch Student / Change Name Button
+        if (changeNameBtn) {
+            changeNameBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (nameEntryCard) nameEntryCard.classList.remove('hidden');
+                if (challengeReadyCard) challengeReadyCard.classList.add('hidden');
+                if (studentNameInput) {
+                    studentNameInput.focus();
+                    studentNameInput.select();
+                }
+            });
+        }
+
+        // 4. Start Over Button
+        if (startOverBtn) {
+            startOverBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (confirm('Start this task fresh from Question 1?')) {
+                    if (window.firebaseService && typeof window.firebaseService.deleteActiveAttempt === 'function') {
+                        window.firebaseService.deleteActiveAttempt(currentStudentId, currentStudentName);
+                    }
+                    localStorage.removeItem('english10_active_attempt_' + currentStudentId);
+                    localStorage.removeItem('english10_quest_attempt_' + currentStudentName);
                     sessionStorage.removeItem('english10_active_state');
+
+                    activeAttemptData = null;
+                    const nextTask = determineNextTask(studentSubmissions);
+                    window.location.href = `quiz.html?task=${nextTask > 3 ? 1 : nextTask}`;
                 }
-                activeAttemptData = null;
-                await checkAndShowBriefing(currentName);
-            }
-        });
-    }
-
-    if (startChallengeBtn) {
-        startChallengeBtn.addEventListener('click', () => {
-            startChallengeBtn.disabled = true;
-            
-            // Determine first uncompleted task
-            let targetTask = 1;
-            if (studentSubmissions[1] && !studentSubmissions[2]) targetTask = 2;
-            else if (studentSubmissions[1] && studentSubmissions[2] && !studentSubmissions[3]) targetTask = 3;
-            else if (studentSubmissions[1] && studentSubmissions[2] && studentSubmissions[3] && !studentSubmissions[4]) targetTask = 4;
-            else if (studentSubmissions[1] && studentSubmissions[2] && studentSubmissions[3] && studentSubmissions[4]) {
-                window.location.href = 'result.html';
-                return;
-            }
-
-            if (activeAttemptData) {
-                startChallengeBtn.innerHTML = '<span>Resuming Quest...</span> <span>⚔️</span>';
-            } else {
-                startChallengeBtn.innerHTML = '<span>Launching Task ' + targetTask + '...</span> <span>🚀</span>';
-            }
-            window.location.href = 'quiz.html?task=' + targetTask;
-        });
-    }
-
-    async function checkAndShowBriefing(name) {
-        hideError();
-        const studentId = window.firebaseService ? window.firebaseService.normalizeStudentId(name) : ('student_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_'));
-        
-        // 1. Fetch all completed task submissions from Firestore / LocalStorage (Tasks 1..4)
-        try {
-            if (window.firebaseService) {
-                studentSubmissions = await window.firebaseService.getAllTaskSubmissionsForStudent(studentId);
-            }
-        } catch (err) {
-            console.warn('Could not query task submissions:', err);
+            });
         }
 
-        // Fallback local checks if offline
-        for (let t = 1; t <= 4; t++) {
-            if (!studentSubmissions[t]) {
-                const localSub = localStorage.getItem('english10_sub_' + studentId + '_task' + t);
-                if (localSub) {
-                    try { studentSubmissions[t] = JSON.parse(localSub); } catch(e) {}
+        // 5. Input Clear Error on Typing
+        if (studentNameInput) {
+            studentNameInput.addEventListener('input', () => hideError());
+        }
+        if (studentSectionInput) {
+            studentSectionInput.addEventListener('input', () => hideError());
+        }
+    }
+
+    // Load Local Storage Submissions Instantly (0ms latency)
+    function loadLocalSubmissions(sid) {
+        const localSubs = { 1: null, 2: null, 3: null, task1: null, task2: null, task3: null };
+        for (let t = 1; t <= 3; t++) {
+            const keys = [
+                `english10_sub_${sid}_task${t}`,
+                `english10_task_submission_${sid}_task${t}`,
+                `english10_sub_${sid}_${t}`
+            ];
+            for (const k of keys) {
+                const raw = localStorage.getItem(k);
+                if (raw) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && (parsed.status === 'completed' || typeof parsed.score === 'number')) {
+                            localSubs[t] = parsed;
+                            localSubs['task' + t] = parsed;
+                            break;
+                        }
+                    } catch (e) {}
                 }
             }
         }
+        return localSubs;
+    }
 
-        // 2. Check Firestore or LocalStorage for active attempt
-        let attempt = null;
+    // Load Local Active Attempt Instantly
+    function loadLocalAttempt(sid, name) {
+        const keys = [
+            `english10_active_attempt_${sid}`,
+            `english10_quest_attempt_${name}`
+        ];
+        for (const k of keys) {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && (!parsed.status || parsed.status === 'in_progress')) {
+                        return parsed;
+                    }
+                } catch (e) {}
+            }
+        }
+        return null;
+    }
+
+    // Main Briefing Handler
+    async function checkAndShowBriefing(name, section = '') {
+        currentStudentName = name;
+        currentStudentSection = section || localStorage.getItem('english10_student_section') || 'Grade 10';
+        currentStudentId = getStudentId(currentStudentName, currentStudentSection);
+
+        console.info('[Student] checkAndShowBriefing for:', currentStudentName, '| Section:', currentStudentSection, '| ID:', currentStudentId);
+
+        // Step 1: Render immediately from Local Storage cache (0ms delay)
+        studentSubmissions = loadLocalSubmissions(currentStudentId);
+        activeAttemptData = loadLocalAttempt(currentStudentId, currentStudentName);
+
+        updateBriefingUI(currentStudentName, currentStudentSection, currentStudentId, activeAttemptData, studentSubmissions);
+
+        if (nameEntryCard) nameEntryCard.classList.add('hidden');
+        if (challengeReadyCard) challengeReadyCard.classList.remove('hidden');
+
+        // Step 2: Query Firestore asynchronously in background to sync newest records
         if (window.firebaseService) {
             try {
-                attempt = await window.firebaseService.getActiveAttempt(studentId, name);
+                const cloudSubmissions = await window.firebaseService.getAllTaskSubmissionsForStudent(currentStudentId);
+                if (cloudSubmissions) {
+                    for (let t = 1; t <= 3; t++) {
+                        if (cloudSubmissions[t]) {
+                            studentSubmissions[t] = cloudSubmissions[t];
+                            studentSubmissions['task' + t] = cloudSubmissions[t];
+                        }
+                    }
+                }
+
+                const cloudAttempt = await window.firebaseService.getActiveAttempt(currentStudentId, currentStudentName);
+                if (cloudAttempt) {
+                    activeAttemptData = cloudAttempt;
+                }
+
+                // Re-render with synced cloud data
+                updateBriefingUI(currentStudentName, currentStudentSection, currentStudentId, activeAttemptData, studentSubmissions);
             } catch (err) {
-                console.warn('Could not query active attempt:', err);
+                console.info('[Student] Background cloud sync note (using local cache):', err.message || err);
             }
         }
-        if (!attempt) {
-            const local = localStorage.getItem('english10_active_attempt_' + studentId) || localStorage.getItem('english10_quest_attempt_' + name);
-            if (local) {
-                try { attempt = JSON.parse(local); } catch (e) {}
-            }
-        }
-
-        activeAttemptData = attempt;
-        updateBriefingUI(name, attempt, studentSubmissions);
-
-        nameEntryCard.classList.add('hidden');
-        challengeReadyCard.classList.remove('hidden');
     }
 
-    function updateBriefingUI(name, attempt, submissions) {
-        welcomeStudentName.textContent = name;
+    // Update the UI Roadmap and Action Buttons
+    function updateBriefingUI(name, section, studentId, attempt, submissions) {
+        if (welcomeStudentName) {
+            welcomeStudentName.textContent = name || 'Learner';
+        }
+        if (welcomeStudentSection) {
+            welcomeStudentSection.textContent = `🏫 Section: ${section || 'Grade 10'}`;
+        }
+        if (welcomeStudentIdBadge) {
+            welcomeStudentIdBadge.textContent = `🆔 ${studentId}`;
+        }
 
-        // Update Roadmap Step Cards (Tasks 1, 2, 3, 4)
-        const totalTasks = 4;
+        const totalTasks = 3;
         let completedCount = 0;
-        let totalScore = 0;
-        let totalQuestions = 0;
 
         for (let t = 1; t <= totalTasks; t++) {
             const stepCard = document.getElementById('mapStep' + t);
@@ -180,18 +334,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (!stepCard) continue;
 
-            const sub = submissions ? submissions[t] : null;
-            const isCompleted = sub && sub.status === 'completed';
-            const prevCompleted = (t === 1) || (submissions && submissions[t - 1] && submissions[t - 1].status === 'completed');
-            const isCurrentActive = attempt && attempt.currentTask === t && (!isCompleted);
+            const sub = submissions ? (submissions[t] || submissions['task' + t]) : null;
+            const completed = isTaskCompleted(sub);
+            const prevSub = (t === 1) ? true : (submissions ? (submissions[t - 1] || submissions['task' + (t - 1)]) : null);
+            const prevCompleted = (t === 1) || isTaskCompleted(prevSub);
+            const isCurrentActive = attempt && attempt.currentTask === t && !completed;
 
             stepCard.classList.remove('step-unlocked', 'step-locked', 'step-completed');
 
-            if (isCompleted) {
+            if (completed) {
                 completedCount++;
-                totalScore += (sub.score || 0);
-                totalQuestions += (sub.totalQuestions || (t === 3 ? 12 : 10));
-
                 stepCard.classList.add('step-completed');
                 if (tagEl) {
                     tagEl.className = 'step-status-tag status-completed';
@@ -199,10 +351,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 if (scoreEl) {
                     scoreEl.classList.remove('hidden');
-                    scoreEl.textContent = `Score: ${sub.score} / ${sub.totalQuestions} (${Math.round(sub.percentage)}%)`;
+                    const totalQ = sub.totalQuestions || (t === 3 ? 12 : 10);
+                    const score = typeof sub.score === 'number' ? sub.score : 0;
+                    const pct = typeof sub.percentage === 'number' ? Math.round(sub.percentage) : Math.round((score / totalQ) * 100);
+                    scoreEl.textContent = `Score: ${score} / ${totalQ} (${pct}%)`;
                 }
                 if (actionEl) {
-                    actionEl.innerHTML = `<a href="result.html?task=${t}" class="btn-step-action btn-view-sub"><span>View Result 👁️</span></a>`;
+                    actionEl.innerHTML = `<a href="result.html" class="btn-step-action btn-view-sub"><span>View Result 👁️</span></a>`;
                 }
             } else if (isCurrentActive) {
                 stepCard.classList.add('step-unlocked');
@@ -218,7 +373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 stepCard.classList.add('step-unlocked');
                 if (tagEl) {
                     tagEl.className = 'step-status-tag status-available';
-                    tagEl.textContent = '● AVAILABLE';
+                    tagEl.textContent = '● READY';
                 }
                 if (scoreEl) scoreEl.classList.add('hidden');
                 if (actionEl) {
@@ -237,58 +392,56 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        // Check if all tasks are complete
-        const allDoneBox = document.getElementById('allTasksCompletedBox');
-        const startActionsBar = document.getElementById('startActionsBar');
-
+        // Check if all 3 tasks are complete
         if (completedCount >= totalTasks) {
-            if (allDoneBox) allDoneBox.classList.remove('hidden');
+            if (allTasksCompletedBox) allTasksCompletedBox.classList.remove('hidden');
             if (startActionsBar) startActionsBar.classList.add('hidden');
             if (activeAttemptBanner) activeAttemptBanner.classList.add('hidden');
-        } else {
-            if (allDoneBox) allDoneBox.classList.add('hidden');
-            if (startActionsBar) startActionsBar.classList.remove('hidden');
+            return;
+        }
 
-            if (attempt && attempt.answersMap && Object.keys(attempt.answersMap).length > 0 && (!submissions || !submissions[attempt.currentTask])) {
-                const answeredCount = Object.keys(attempt.answersMap).length;
-                const currentTask = attempt.currentTask || 1;
-                const xp = attempt.earnedXP || (attempt.score ? attempt.score * 10 : 0);
+        if (allTasksCompletedBox) allTasksCompletedBox.classList.add('hidden');
+        if (startActionsBar) startActionsBar.classList.remove('hidden');
 
-                let timeRemainingSec = 2520;
-                if (attempt.started_at_ms || attempt.started_at) {
-                    const startMs = attempt.started_at_ms || new Date(attempt.started_at).getTime();
-                    const elapsedSec = Math.floor((Date.now() - startMs) / 1000);
-                    timeRemainingSec = Math.max(0, 2520 - elapsedSec);
-                } else if (typeof attempt.timeRemaining === 'number') {
-                    timeRemainingSec = attempt.timeRemaining;
-                }
+        // Check if there is an active resume attempt
+        const hasActiveAnswers = attempt && attempt.answersMap && Object.keys(attempt.answersMap).length > 0;
+        const activeTaskCompleted = attempt && attempt.currentTask && isTaskCompleted(submissions ? (submissions[attempt.currentTask] || submissions['task' + attempt.currentTask]) : null);
 
-                const m = Math.floor(timeRemainingSec / 60);
-                const s = timeRemainingSec % 60;
-                const formattedTime = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        if (hasActiveAnswers && !activeTaskCompleted) {
+            const answeredCount = Object.keys(attempt.answersMap).length;
+            const currentTask = attempt.currentTask || 1;
+            const xp = attempt.earnedXP || (attempt.score ? attempt.score * 10 : 0);
 
-                if (resumeTaskName) resumeTaskName.textContent = 'Task ' + currentTask;
-                if (resumeProgress) resumeProgress.textContent = answeredCount + ' / 42';
-                if (resumeXP) resumeXP.textContent = xp + ' XP';
-                if (resumeTimeLeft) resumeTimeLeft.textContent = formattedTime;
-
-                if (activeAttemptBanner) activeAttemptBanner.classList.remove('hidden');
-                if (startOverBtn) startOverBtn.classList.remove('hidden');
-
-                if (startBtnText) startBtnText.textContent = 'RESUME TASK ' + currentTask;
-                if (startBtnIcon) startBtnIcon.textContent = '⚔️';
-            } else {
-                if (activeAttemptBanner) activeAttemptBanner.classList.add('hidden');
-                if (startOverBtn) startOverBtn.classList.add('hidden');
-
-                let nextTask = 1;
-                if (submissions && submissions[1] && !submissions[2]) nextTask = 2;
-                else if (submissions && submissions[1] && submissions[2] && !submissions[3]) nextTask = 3;
-                else if (submissions && submissions[1] && submissions[2] && submissions[3] && !submissions[4]) nextTask = 4;
-
-                if (startBtnText) startBtnText.textContent = 'START TASK ' + nextTask;
-                if (startBtnIcon) startBtnIcon.textContent = '🔥';
+            let timeRemainingSec = 1920;
+            if (attempt.started_at_ms || attempt.started_at) {
+                const startMs = attempt.started_at_ms || new Date(attempt.started_at).getTime();
+                const elapsedSec = Math.floor((Date.now() - startMs) / 1000);
+                timeRemainingSec = Math.max(0, 1920 - elapsedSec);
+            } else if (typeof attempt.timeRemaining === 'number') {
+                timeRemainingSec = attempt.timeRemaining;
             }
+
+            const m = Math.floor(timeRemainingSec / 60);
+            const s = timeRemainingSec % 60;
+            const formattedTime = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+
+            if (resumeTaskName) resumeTaskName.textContent = 'Task ' + currentTask;
+            if (resumeProgress) resumeProgress.textContent = answeredCount + ' / 32';
+            if (resumeXP) resumeXP.textContent = xp + ' XP';
+            if (resumeTimeLeft) resumeTimeLeft.textContent = formattedTime;
+
+            if (activeAttemptBanner) activeAttemptBanner.classList.remove('hidden');
+            if (startOverBtn) startOverBtn.classList.remove('hidden');
+
+            if (startBtnText) startBtnText.textContent = 'RESUME TASK ' + currentTask;
+            if (startBtnIcon) startBtnIcon.textContent = '⚔️';
+        } else {
+            if (activeAttemptBanner) activeAttemptBanner.classList.add('hidden');
+            if (startOverBtn) startOverBtn.classList.add('hidden');
+
+            const nextTask = determineNextTask(submissions);
+            if (startBtnText) startBtnText.textContent = (nextTask === 1 ? 'START THE QUEST' : 'START TASK ' + nextTask);
+            if (startBtnIcon) startBtnIcon.textContent = '🔥';
         }
     }
 
@@ -305,4 +458,38 @@ document.addEventListener('DOMContentLoaded', async () => {
             nameError.classList.add('hidden');
         }
     }
+
+    // Initialize: Bind events immediately
+    bindEvents();
+
+    // Check for existing logged in student session
+    let existingName = '';
+    let existingSection = '';
+    try {
+        if (window.AuthManager && typeof window.AuthManager.getCurrentStudent === 'function') {
+            const studentObj = window.AuthManager.getCurrentStudent();
+            if (studentObj && studentObj.name) {
+                existingName = studentObj.name;
+                existingSection = studentObj.section || '';
+            }
+        }
+        if (!existingName) {
+            existingName = localStorage.getItem('english10_student_name') || '';
+            existingSection = localStorage.getItem('english10_student_section') || '';
+        }
+    } catch (e) {
+        existingName = localStorage.getItem('english10_student_name') || '';
+        existingSection = localStorage.getItem('english10_student_section') || '';
+    }
+
+    if (existingName && existingName.trim().length >= 2) {
+        if (studentNameInput) studentNameInput.value = existingName.trim();
+        if (studentSectionInput) studentSectionInput.value = (existingSection || '').trim();
+        checkAndShowBriefing(existingName.trim(), existingSection.trim());
+    } else {
+        if (nameEntryCard) nameEntryCard.classList.remove('hidden');
+        if (challengeReadyCard) challengeReadyCard.classList.add('hidden');
+        if (studentNameInput) studentNameInput.focus();
+    }
 });
+

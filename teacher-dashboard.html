@@ -87,6 +87,35 @@
           </div>
         </section>
 
+        <!-- Active / Registered Students Live Roster -->
+        <section class="active-students-card">
+          <div class="active-students-header">
+            <div class="active-students-title">
+              <span>👥</span>
+              <span>Learners Presence Roster</span>
+              <span id="activeStudentsCountBadge" class="active-count-badge"
+                >0 Logged In</span
+              >
+            </div>
+            <span style="font-size: 0.78rem; color: #64748b"
+              >Live updates across all sections</span
+            >
+          </div>
+          <div id="activeStudentsContainer" class="active-students-grid">
+            <div
+              style="
+                grid-column: 1 / -1;
+                text-align: center;
+                color: #94a3b8;
+                font-size: 0.85rem;
+                padding: 1rem;
+              "
+            >
+              ⏳ Loading active learners...
+            </div>
+          </div>
+        </section>
+
         <!-- Toolbar & Search -->
         <section class="dash-toolbar">
           <div class="search-input-wrap">
@@ -95,11 +124,15 @@
               type="text"
               id="searchInput"
               class="search-field"
-              placeholder="Search student name..."
+              placeholder="Search student name or section..."
             />
           </div>
 
           <div class="toolbar-actions">
+            <select id="sectionFilter" class="filter-dropdown">
+              <option value="all">All Sections</option>
+            </select>
+
             <select id="scoreFilter" class="filter-dropdown">
               <option value="all">All Performance Levels</option>
               <option value="mastery">Mastery (90–100%)</option>
@@ -135,12 +168,12 @@
               <thead>
                 <tr>
                   <th data-sort="studentName">Student Name ↕</th>
+                  <th data-sort="section">Section ↕</th>
                   <th data-sort="t1" class="text-center">Task 1 (/10) ↕</th>
                   <th data-sort="t2" class="text-center">Task 2 (/10) ↕</th>
                   <th data-sort="t3" class="text-center">Task 3 (/12) ↕</th>
-                  <th data-sort="t4" class="text-center">Task 4 (/10) ↕</th>
                   <th data-sort="totalScore" class="text-center">
-                    Total (/42) ↕
+                    Total (/32) ↕
                   </th>
                   <th data-sort="percentage" class="text-center">Score % ↕</th>
                   <th data-sort="completedAt">Date Completed ↕</th>
@@ -163,9 +196,22 @@
           <div>
             <span class="detail-tag">STUDENT RESULT</span>
             <h2 id="modalStudentName" class="detail-name">Juan Dela Cruz</h2>
+            <div
+              style="
+                font-size: 0.85rem;
+                color: #64748b;
+                font-weight: 700;
+                margin-top: 0.2rem;
+              "
+            >
+              Section:
+              <span id="modalStudentSection" class="section-pill"
+                >Grade 10</span
+              >
+            </div>
           </div>
           <div class="detail-score-box">
-            <span id="modalFinalScore" class="detail-score-val">24 / 42</span>
+            <span id="modalFinalScore" class="detail-score-val">24 / 32</span>
             <span id="modalPercentage" class="detail-pill">75%</span>
           </div>
         </div>
@@ -200,16 +246,6 @@
             </div>
             <div id="modalT3Breakdown" class="dt-sub">
               Correct: 9 | Wrong: 3 | Unanswered: 0
-            </div>
-          </div>
-
-          <div class="detail-task-card">
-            <div class="dt-header">
-              <strong>💡 TASK 4 — Synthesizing & Composing</strong>
-              <span id="modalT4Score" class="dt-score">8 / 10</span>
-            </div>
-            <div id="modalT4Breakdown" class="dt-sub">
-              Correct: 8 | Wrong: 2 | Unanswered: 0
             </div>
           </div>
         </div>
@@ -343,36 +379,6 @@
               &nbsp;•&nbsp; 5-A &nbsp;•&nbsp; 6-B<br />
               7-A &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-A &nbsp;•&nbsp; 10-A
               &nbsp;•&nbsp; 11-B &nbsp;•&nbsp; 12-A
-            </p>
-          </div>
-
-          <div
-            style="
-              background: #f8fafc;
-              border: 1.5px solid #e2e8f0;
-              border-radius: var(--radius-md);
-              padding: 1.25rem;
-              margin-bottom: 1rem;
-            "
-          >
-            <h3
-              style="color: #d97706; font-size: 1.05rem; margin-bottom: 0.5rem"
-            >
-              💡 TASK 4 — Synthesizing, Composing, and Expressing Insights (10
-              Questions)
-            </h3>
-            <p
-              style="
-                font-family: var(--font-mono);
-                font-size: 0.95rem;
-                font-weight: 700;
-                line-height: 1.8;
-              "
-            >
-              1-B &nbsp;•&nbsp; 2-B &nbsp;•&nbsp; 3-C &nbsp;•&nbsp; 4-B
-              &nbsp;•&nbsp; 5-B<br />
-              6-A &nbsp;•&nbsp; 7-B &nbsp;•&nbsp; 8-C &nbsp;•&nbsp; 9-B
-              &nbsp;•&nbsp; 10-A
             </p>
           </div>
         </div>

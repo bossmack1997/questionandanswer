@@ -5,26 +5,24 @@
 
 const QUIZ_CONFIG = {
     // Central tasks definition
-    TASKS: [1, 2, 3, 4],
+    TASKS: [1, 2, 3],
 
     // Timer configuration (in seconds)
     task1TimePerQuestion: 60,
     task2TimePerQuestion: 60,
     task3TimePerQuestion: 60,
-    task4TimePerQuestion: 60,
-    overallTimerSeconds: 2520, // 42 minutes for 42 questions
+    overallTimerSeconds: 1920, // 32 minutes for 32 questions
 
     // Anti-cheating rules
     maxTabSwitches: 3,
 
     // Points and totals
     pointsPerCorrect: 1,
-    totalQuestions: 42,
-    maxXP: 420,
+    totalQuestions: 32,
+    maxXP: 320,
     task1Total: 10,
     task2Total: 10,
     task3Total: 12,
-    task4Total: 10,
 
     // Gamification thresholds
     streakThresholds: {

@@ -1,14 +1,16 @@
 /**
  * TEACHER DASHBOARD CONTROLLER
- * Real-time results retrieval, KPI calculations, search, filters,
- * column sorting, student drill-down modal, official answer key viewer, and CSV export.
+ * Real-time results retrieval, Active Students Presence Roster, Section Filters,
+ * KPI calculations, search, column sorting, student drill-down modal, answer key, and CSV export.
  */
 
 class TeacherDashboard {
     constructor() {
         this.results = [];
+        this.activeStudents = [];
         this.filteredResults = [];
         this.currentSort = { field: 'completedAt', order: 'desc' };
+        this.activePresenceInterval = null;
 
         this.init();
     }
@@ -22,6 +24,10 @@ class TeacherDashboard {
             const userEmailEl = document.getElementById('teacherUserEmail');
             if (userEmailEl) userEmailEl.textContent = user.email || 'Teacher';
             this.loadData();
+
+            // Poll active presence every 15 seconds
+            if (this.activePresenceInterval) clearInterval(this.activePresenceInterval);
+            this.activePresenceInterval = setInterval(() => this.loadActivePresenceOnly(), 15000);
         });
 
         this.bindEvents();
@@ -31,6 +37,7 @@ class TeacherDashboard {
         const logoutBtn = document.getElementById('teacherLogoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', async () => {
+                if (this.activePresenceInterval) clearInterval(this.activePresenceInterval);
                 await window.firebaseService.teacherSignOut();
                 window.location.replace('teacher-login.html');
             });
@@ -39,6 +46,11 @@ class TeacherDashboard {
         const searchInput = document.getElementById('searchInput');
         if (searchInput) {
             searchInput.addEventListener('input', () => this.applyFilters());
+        }
+
+        const sectionFilter = document.getElementById('sectionFilter');
+        if (sectionFilter) {
+            sectionFilter.addEventListener('change', () => this.applyFilters());
         }
 
         const scoreFilter = document.getElementById('scoreFilter');
@@ -88,7 +100,7 @@ class TeacherDashboard {
                     this.currentSort.order = (this.currentSort.order === 'asc') ? 'desc' : 'asc';
                 } else {
                     this.currentSort.field = field;
-                    this.currentSort.order = (field === 'studentName') ? 'asc' : 'desc';
+                    this.currentSort.order = (field === 'studentName' || field === 'section') ? 'asc' : 'desc';
                 }
                 this.updateSortIcons();
                 this.applyFilters();
@@ -101,8 +113,17 @@ class TeacherDashboard {
         if (loadingIndicator) loadingIndicator.classList.remove('hidden');
 
         try {
-            this.results = await window.firebaseService.getAllResults();
+            const [resultsData, activeData] = await Promise.all([
+                window.firebaseService.getAllResults(),
+                window.firebaseService.getActiveStudents()
+            ]);
+
+            this.results = resultsData || [];
+            this.activeStudents = activeData || [];
+
             this.updateKPIs();
+            this.populateSectionDropdown();
+            this.renderActiveStudents();
             this.applyFilters();
         } catch (err) {
             console.error('Error loading dashboard data:', err);
@@ -110,6 +131,106 @@ class TeacherDashboard {
         } finally {
             if (loadingIndicator) loadingIndicator.classList.add('hidden');
         }
+    }
+
+    async loadActivePresenceOnly() {
+        try {
+            this.activeStudents = await window.firebaseService.getActiveStudents();
+            this.renderActiveStudents();
+        } catch (e) {
+            console.warn('Error updating presence:', e);
+        }
+    }
+
+    populateSectionDropdown() {
+        const sectionSelect = document.getElementById('sectionFilter');
+        if (!sectionSelect) return;
+
+        const currentVal = sectionSelect.value;
+        const sectionsSet = new Set();
+
+        this.results.forEach(r => {
+            const s = (r.section || r.studentSection || '').trim();
+            if (s) sectionsSet.add(s);
+        });
+
+        this.activeStudents.forEach(st => {
+            const s = (st.section || '').trim();
+            if (s) sectionsSet.add(s);
+        });
+
+        const sortedSections = Array.from(sectionsSet).sort();
+
+        sectionSelect.innerHTML = '<option value="all">All Sections</option>';
+        sortedSections.forEach(sec => {
+            const opt = document.createElement('option');
+            opt.value = sec;
+            opt.textContent = `Section: ${sec}`;
+            sectionSelect.appendChild(opt);
+        });
+
+        if (sortedSections.includes(currentVal)) {
+            sectionSelect.value = currentVal;
+        }
+    }
+
+    renderActiveStudents() {
+        const container = document.getElementById('activeStudentsContainer');
+        const badge = document.getElementById('activeStudentsCountBadge');
+
+        if (badge) {
+            badge.textContent = `${this.activeStudents.length} Registered / Active`;
+        }
+
+        if (!container) return;
+
+        if (this.activeStudents.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; color: #94a3b8; font-size: 0.85rem; padding: 1rem;">
+                    No learners have registered or logged in yet today.
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = '';
+        this.activeStudents.forEach(st => {
+            const item = document.createElement('div');
+            item.className = 'active-student-item';
+
+            const status = (st.status || 'Online').toLowerCase();
+            let dotClass = 'dot-online';
+            let statusText = 'Online';
+            let statusBadgeClass = 'status-online';
+
+            if (status.includes('completed')) {
+                dotClass = 'dot-completed';
+                statusText = 'Completed';
+                statusBadgeClass = 'status-completed';
+            } else if (status.includes('progress') || status.includes('task')) {
+                dotClass = 'dot-progress';
+                statusText = st.status || 'In Progress';
+                statusBadgeClass = 'status-progress';
+            }
+
+            const timeStr = st.lastActive ? new Date(st.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent';
+
+            item.innerHTML = `
+                <div class="active-student-info">
+                    <span class="active-student-name">${st.name || 'Student'}</span>
+                    <div class="active-student-meta">
+                        <span class="section-pill">${st.section || 'Grade 10'}</span>
+                        <span>• ${timeStr}</span>
+                    </div>
+                </div>
+                <span class="status-indicator ${statusBadgeClass}">
+                    <span class="status-dot ${dotClass}"></span>
+                    ${statusText}
+                </span>
+            `;
+
+            container.appendChild(item);
+        });
     }
 
     updateKPIs() {
@@ -145,10 +266,18 @@ class TeacherDashboard {
     applyFilters() {
         const query = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
         const scoreVal = document.getElementById('scoreFilter')?.value || 'all';
+        const sectionVal = document.getElementById('sectionFilter')?.value || 'all';
 
         this.filteredResults = this.results.filter(r => {
-            const nameMatch = (r.studentName || '').toLowerCase().includes(query);
-            if (query && !nameMatch) return false;
+            const studentName = (r.studentName || '').toLowerCase();
+            const studentSection = (r.section || r.studentSection || '').toLowerCase();
+
+            const queryMatch = !query || studentName.includes(query) || studentSection.includes(query);
+            if (!queryMatch) return false;
+
+            if (sectionVal !== 'all' && (r.section || r.studentSection || '') !== sectionVal) {
+                return false;
+            }
 
             const p = r.percentage || 0;
             if (scoreVal === 'mastery' && p < 90) return false;
@@ -166,6 +295,9 @@ class TeacherDashboard {
             if (field === 'completedAt') {
                 valA = new Date(valA || 0).getTime();
                 valB = new Date(valB || 0).getTime();
+            } else if (field === 'section') {
+                valA = (a.section || a.studentSection || '').toLowerCase();
+                valB = (b.section || b.studentSection || '').toLowerCase();
             } else if (field === 't1') {
                 valA = a.task1Score || 0;
                 valB = b.task1Score || 0;
@@ -175,9 +307,6 @@ class TeacherDashboard {
             } else if (field === 't3') {
                 valA = a.task3Score || 0;
                 valB = b.task3Score || 0;
-            } else if (field === 't4') {
-                valA = a.task4Score || 0;
-                valB = b.task4Score || 0;
             } else if (typeof valA === 'string') {
                 valA = valA.toLowerCase();
                 valB = (valB || '').toLowerCase();
@@ -233,14 +362,15 @@ class TeacherDashboard {
             else if (p >= 75) pillClass = 'pct-proficient';
 
             const dateStr = r.completedAt ? new Date(r.completedAt).toLocaleDateString() : 'N/A';
+            const secStr = r.section || r.studentSection || 'Grade 10';
 
             tr.innerHTML = `
                 <td style="font-weight: 800; color: #0f172a;">${r.studentName || 'N/A'}</td>
+                <td><span class="section-pill">${secStr}</span></td>
                 <td class="text-center">${r.task1Score || 0}/10</td>
                 <td class="text-center">${r.task2Score || 0}/10</td>
                 <td class="text-center">${r.task3Score || 0}/12</td>
-                <td class="text-center">${r.task4Score || 0}/10</td>
-                <td class="text-center" style="font-weight: 800;">${r.totalScore || 0}/42</td>
+                <td class="text-center" style="font-weight: 800;">${r.totalScore || 0}/32</td>
                 <td class="text-center"><span class="pill-pct ${pillClass}">${p}%</span></td>
                 <td class="text-muted" style="font-size: 0.85rem;">${dateStr}</td>
                 <td class="text-center">
@@ -262,7 +392,11 @@ class TeacherDashboard {
         if (!modal) return;
 
         document.getElementById('modalStudentName').textContent = r.studentName || 'N/A';
-        document.getElementById('modalFinalScore').textContent = `${r.totalScore || 0} / 42`;
+        const modalSection = document.getElementById('modalStudentSection');
+        if (modalSection) {
+            modalSection.textContent = r.section || r.studentSection || 'Grade 10';
+        }
+        document.getElementById('modalFinalScore').textContent = `${r.totalScore || 0} / 32`;
         document.getElementById('modalPercentage').textContent = `${Math.round(r.percentage || 0)}%`;
 
         document.getElementById('modalT1Score').textContent = `${r.task1Score || 0} / 10`;
@@ -273,11 +407,6 @@ class TeacherDashboard {
 
         document.getElementById('modalT3Score').textContent = `${r.task3Score || 0} / 12`;
         document.getElementById('modalT3Breakdown').textContent = `Correct: ${r.task3Correct || 0} | Wrong: ${r.task3Wrong || 0} | Unanswered: ${r.task3Unanswered || 0}`;
-
-        const t4ScoreEl = document.getElementById('modalT4Score');
-        if (t4ScoreEl) t4ScoreEl.textContent = `${r.task4Score || 0} / 10`;
-        const t4BreakdownEl = document.getElementById('modalT4Breakdown');
-        if (t4BreakdownEl) t4BreakdownEl.textContent = `Correct: ${r.task4Correct || 0} | Wrong: ${r.task4Wrong || 0} | Unanswered: ${r.task4Unanswered || 0}`;
 
         const mins = Math.floor((r.timeUsed || 0) / 60);
         const secs = (r.timeUsed || 0) % 60;
@@ -300,14 +429,14 @@ class TeacherDashboard {
             return;
         }
 
-        const headers = ['Student Name', 'Task 1 (/10)', 'Task 2 (/10)', 'Task 3 (/12)', 'Task 4 (/10)', 'Total Score (/42)', 'Percentage (%)', 'Time Used (seconds)', 'Auto Submitted', 'Date Completed'];
+        const headers = ['Student Name', 'Section', 'Task 1 (/10)', 'Task 2 (/10)', 'Task 3 (/12)', 'Total Score (/32)', 'Percentage (%)', 'Time Used (seconds)', 'Auto Submitted', 'Date Completed'];
 
         const rows = this.filteredResults.map(r => [
             `"${(r.studentName || '').replace(/"/g, '""')}"`,
+            `"${(r.section || r.studentSection || 'Grade 10').replace(/"/g, '""')}"`,
             r.task1Score || 0,
             r.task2Score || 0,
             r.task3Score || 0,
-            r.task4Score || 0,
             r.totalScore || 0,
             r.percentage || 0,
             r.timeUsed || 0,

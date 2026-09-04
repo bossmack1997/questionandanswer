@@ -29,12 +29,6 @@ const READING_PASSAGES = {
         title: "Language, Style, Cohesion, and Culture",
         instructions: "Read each item carefully and select the best answer.",
         content: null
-    },
-    task4: {
-        task_id: 4,
-        title: "Synthesizing, Composing, and Expressing Insights",
-        instructions: "Read the excerpt below carefully before answering the questions:",
-        content: "“A resilient community thrives not by avoiding hardships, but by facing them collectively. When young learners understand their cultural heritage and articulate their ideas with clarity and purpose, they contribute meaningfully to nation-building.”"
     }
 };
 
@@ -496,148 +490,6 @@ const masterQuestionBank = {
             correct_option_id: "T3Q12-A",
             points: 1
         }
-    ],
-    task4: [
-        {
-            task_id: 4,
-            question_id: "T4-Q01",
-            original_number: 1,
-            question_text: "What is the primary purpose of synthesizing information from multiple sources?",
-            choices: [
-                { option_id: "T4Q01-A", text: "To memorize all facts word-for-word", is_correct: false },
-                { option_id: "T4Q01-B", text: "To combine different ideas to form a new and cohesive understanding", is_correct: true },
-                { option_id: "T4Q01-C", text: "To discard conflicting opinions immediately", is_correct: false },
-                { option_id: "T4Q01-D", text: "To repeat the exact phrasing of the original text", is_correct: false }
-            ],
-            correct_option_id: "T4Q01-B",
-            points: 1
-        },
-        {
-            task_id: 4,
-            question_id: "T4-Q02",
-            original_number: 2,
-            question_text: "Which of the following statements best expresses a strong, defensible claim?",
-            choices: [
-                { option_id: "T4Q02-A", text: "Storytelling is one of the most effective ways to preserve cultural heritage because it connects values across generations.", is_correct: true },
-                { option_id: "T4Q02-B", text: "Many people read stories every day.", is_correct: false },
-                { option_id: "T4Q02-C", text: "Some books are long and some are short.", is_correct: false },
-                { option_id: "T4Q02-D", text: "I think books are interesting.", is_correct: false }
-            ],
-            correct_option_id: "T4Q02-A",
-            points: 1
-        },
-        {
-            task_id: 4,
-            question_id: "T4-Q03",
-            original_number: 3,
-            question_text: "When evaluating the credibility of an informational text, what should a reader check first?",
-            choices: [
-                { option_id: "T4Q03-A", text: "The font size used in the document", is_correct: false },
-                { option_id: "T4Q03-B", text: "The author's expertise, source evidence, and objectivity", is_correct: true },
-                { option_id: "T4Q03-C", text: "The number of pictures included", is_correct: false },
-                { option_id: "T4Q03-D", text: "How colorful the cover page is", is_correct: false }
-            ],
-            correct_option_id: "T4Q03-B",
-            points: 1
-        },
-        {
-            task_id: 4,
-            question_id: "T4-Q04",
-            original_number: 4,
-            question_text: "Which transition word is best suited for concluding an argumentative essay?",
-            choices: [
-                { option_id: "T4Q04-A", text: "Ultimately", is_correct: true },
-                { option_id: "T4Q04-B", text: "Meanwhile", is_correct: false },
-                { option_id: "T4Q04-C", text: "Suddenly", is_correct: false },
-                { option_id: "T4Q04-D", text: "Earlier", is_correct: false }
-            ],
-            correct_option_id: "T4Q04-A",
-            points: 1
-        },
-        {
-            task_id: 4,
-            question_id: "T4-Q05",
-            original_number: 5,
-            question_text: "What makes an argument biased?",
-            choices: [
-                { option_id: "T4Q05-A", text: "It relies on verified facts and peer-reviewed data", is_correct: false },
-                { option_id: "T4Q05-B", text: "It presents only one side while unfairly ignoring opposing evidence", is_correct: true },
-                { option_id: "T4Q05-C", text: "It acknowledges multiple perspectives fairly", is_correct: false },
-                { option_id: "T4Q05-D", text: "It uses clear and objective language", is_correct: false }
-            ],
-            correct_option_id: "T4Q05-B",
-            points: 1
-        },
-        {
-            task_id: 4,
-            question_id: "T4-Q06",
-            original_number: 6,
-            question_text: "How should a speaker adjust their language when presenting to an academic panel compared to talking with close friends?",
-            choices: [
-                { option_id: "T4Q06-A", text: "Use formal diction, structured explanations, and precise vocabulary", is_correct: true },
-                { option_id: "T4Q06-B", text: "Use casual slang and incomplete sentences", is_correct: false },
-                { option_id: "T4Q06-C", text: "Speak as quickly as possible without pausing", is_correct: false },
-                { option_id: "T4Q06-D", text: "Avoid explaining key concepts", is_correct: false }
-            ],
-            correct_option_id: "T4Q06-A",
-            points: 1
-        },
-        {
-            task_id: 4,
-            question_id: "T4-Q07",
-            original_number: 7,
-            question_text: "Which evidence best supports the claim that community gardens improve neighborhood solidarity?",
-            choices: [
-                { option_id: "T4Q07-A", text: "Gardening can be done on weekends.", is_correct: false },
-                { option_id: "T4Q07-B", text: "A local survey revealed that 85% of participating families reported stronger bonds and cooperation with their neighbors.", is_correct: true },
-                { option_id: "T4Q07-C", text: "Tomatoes require ample sunlight to grow.", is_correct: false },
-                { option_id: "T4Q07-D", text: "Gardens are usually green and pleasant.", is_correct: false }
-            ],
-            correct_option_id: "T4Q07-B",
-            points: 1
-        },
-        {
-            task_id: 4,
-            question_id: "T4-Q08",
-            original_number: 8,
-            question_text: "What is the primary role of a counterargument in a persuasive essay?",
-            choices: [
-                { option_id: "T4Q08-A", text: "To confuse the reader about the author's stance", is_correct: false },
-                { option_id: "T4Q08-B", text: "To acknowledge opposing views and demonstrate why the author's position remains stronger", is_correct: true },
-                { option_id: "T4Q08-C", text: "To make the essay shorter", is_correct: false },
-                { option_id: "T4Q08-D", text: "To repeat the opening hook", is_correct: false }
-            ],
-            correct_option_id: "T4Q08-B",
-            points: 1
-        },
-        {
-            task_id: 4,
-            question_id: "T4-Q09",
-            original_number: 9,
-            question_text: "When revising an essay for cohesion, a student should focus on—",
-            choices: [
-                { option_id: "T4Q09-A", text: "Ensuring smooth transitions and logical connections between sentences and paragraphs", is_correct: true },
-                { option_id: "T4Q09-B", text: "Changing the topic of every paragraph randomly", is_correct: false },
-                { option_id: "T4Q09-C", text: "Increasing the font size to fill space", is_correct: false },
-                { option_id: "T4Q09-D", text: "Removing all punctuation marks", is_correct: false }
-            ],
-            correct_option_id: "T4Q09-A",
-            points: 1
-        },
-        {
-            task_id: 4,
-            question_id: "T4-Q10",
-            original_number: 10,
-            question_text: "Which statement best summarizes the core theme of the English 10 remediation passage on community resilience?",
-            choices: [
-                { option_id: "T4Q10-A", text: "Individual achievement is more important than group success.", is_correct: false },
-                { option_id: "T4Q10-B", text: "Collective responsibility and cultural awareness build an enduring and empowered community.", is_correct: true },
-                { option_id: "T4Q10-C", text: "Communities should avoid all forms of change.", is_correct: false },
-                { option_id: "T4Q10-D", text: "Young learners should only study scientific machines.", is_correct: false }
-            ],
-            correct_option_id: "T4Q10-B",
-            points: 1
-        }
     ]
 };
 
@@ -645,8 +497,7 @@ const masterQuestionBank = {
 const TEACHER_MASTER_KEY = {
     task1: { 1: "C", 2: "C", 3: "B", 4: "A", 5: "B", 6: "A", 7: "C", 8: "A", 9: "A", 10: "B" },
     task2: { 1: "B", 2: "A", 3: "A", 4: "A", 5: "B", 6: "B", 7: "A", 8: "A", 9: "B", 10: "A" },
-    task3: { 1: "A", 2: "B", 3: "A", 4: "A", 5: "A", 6: "B", 7: "A", 8: "A", 9: "A", 10: "A", 11: "B", 12: "A" },
-    task4: { 1: "B", 2: "A", 3: "B", 4: "A", 5: "B", 6: "A", 7: "B", 8: "B", 9: "A", 10: "B" }
+    task3: { 1: "A", 2: "B", 3: "A", 4: "A", 5: "A", 6: "B", 7: "A", 8: "A", 9: "A", 10: "A", 11: "B", 12: "A" }
 };
 
 /**
@@ -659,16 +510,14 @@ function validateQuizDatabase() {
     const allQuestions = [
         ...masterQuestionBank.task1,
         ...masterQuestionBank.task2,
-        ...masterQuestionBank.task3,
-        ...masterQuestionBank.task4
+        ...masterQuestionBank.task3
     ];
 
     // 1. Task Counts
     if (masterQuestionBank.task1.length !== 10) errors.push(`Task 1 expected 10 questions, found ${masterQuestionBank.task1.length}`);
     if (masterQuestionBank.task2.length !== 10) errors.push(`Task 2 expected 10 questions, found ${masterQuestionBank.task2.length}`);
     if (masterQuestionBank.task3.length !== 12) errors.push(`Task 3 expected 12 questions, found ${masterQuestionBank.task3.length}`);
-    if (masterQuestionBank.task4.length !== 10) errors.push(`Task 4 expected 10 questions, found ${masterQuestionBank.task4.length}`);
-    if (allQuestions.length !== 42) errors.push(`Total questions expected 42, found ${allQuestions.length}`);
+    if (allQuestions.length !== 32) errors.push(`Total questions expected 32, found ${allQuestions.length}`);
 
     // 2. Uniqueness & Structure Checks
     const qIds = new Set();
@@ -751,7 +600,6 @@ function validateQuizDatabase() {
             task1: masterQuestionBank.task1.length,
             task2: masterQuestionBank.task2.length,
             task3: masterQuestionBank.task3.length,
-            task4: masterQuestionBank.task4.length,
             total: allQuestions.length,
             randomizationAudit: randomizationValid ? "100% PASSED" : "FAILED"
         }

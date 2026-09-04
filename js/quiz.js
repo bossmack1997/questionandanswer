@@ -20,12 +20,11 @@ class EnglishQuestEngine {
                                 ((typeof readingMaterials !== 'undefined') ? readingMaterials : 
                                 ((typeof window !== 'undefined' && (window.READING_PASSAGES || window.readingMaterials)) || {}));
 
-        // Questions structure (10 in Task 1, 10 in Task 2, 12 in Task 3, 10 in Task 4)
+        // Questions structure (10 in Task 1, 10 in Task 2, 12 in Task 3)
         this.taskQuestions = {
             task1: [],
             task2: [],
-            task3: [],
-            task4: []
+            task3: []
         };
         this.currentQuestion = null;
         this.selectedOptionId = null;
@@ -39,8 +38,8 @@ class EnglishQuestEngine {
         this.answersMap = {};
 
         // Gamification & Scores
-        this.score = 0;             // Total correct count (0..42)
-        this.earnedXP = 0;          // Total XP (0..420)
+        this.score = 0;             // Total correct count (0..32)
+        this.earnedXP = 0;          // Total XP (0..320)
         this.streak = 0;            // Current consecutive correct streak
         this.maxStreak = 0;         // Best streak achieved
         
@@ -48,12 +47,11 @@ class EnglishQuestEngine {
         this.taskScores = {
             task1: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 10, completed: false },
             task2: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 10, completed: false },
-            task3: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 12, completed: false },
-            task4: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 10, completed: false }
+            task3: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 12, completed: false }
         };
 
-        // 42-Minute Quest Challenge Timer (2520 seconds total)
-        this.totalDurationSeconds = (typeof QUIZ_CONFIG !== "undefined" && QUIZ_CONFIG.overallTimerSeconds) || 2520;
+        // 32-Minute Quest Challenge Timer (1920 seconds total)
+        this.totalDurationSeconds = (typeof QUIZ_CONFIG !== "undefined" && QUIZ_CONFIG.overallTimerSeconds) || 1920;
         this.timeRemaining = this.totalDurationSeconds;
         this.totalTimeUsed = 0;
         this.timer = null;
@@ -64,8 +62,8 @@ class EnglishQuestEngine {
             student_name: "",
             student_id: "",
             started_at: this.startedAt,
-            task_order: [1, 2, 3, 4],
-            question_order: { task1: [], task2: [], task3: [], task4: [] },
+            task_order: [1, 2, 3],
+            question_order: { task1: [], task2: [], task3: [] },
             option_order: {},
             selected_answers: {}
         };
@@ -90,7 +88,13 @@ class EnglishQuestEngine {
 
         // Student identity check
         if (typeof localStorage !== "undefined" && typeof sessionStorage !== "undefined") {
-            this.studentName = localStorage.getItem('studentName') || sessionStorage.getItem('studentName');
+            let sessionObj = null;
+            if (typeof window !== "undefined" && window.AuthManager && typeof window.AuthManager.getCurrentStudent === "function") {
+                sessionObj = window.AuthManager.getCurrentStudent();
+            }
+            this.studentName = (sessionObj && sessionObj.name) || localStorage.getItem('english10_student_name') || localStorage.getItem('studentName') || sessionStorage.getItem('studentName');
+            this.studentSection = (sessionObj && sessionObj.section) || localStorage.getItem('english10_student_section') || 'Grade 10';
+
             if (!this.studentName || this.studentName.trim().length < 2) {
                 if (typeof window !== "undefined" && window.location) {
                     window.location.replace('student.html');
@@ -99,15 +103,17 @@ class EnglishQuestEngine {
             }
         } else {
             this.studentName = "Student";
+            this.studentSection = "Grade 10";
         }
         
         if (typeof window !== "undefined" && window.firebaseService) {
-            this.studentId = window.firebaseService.normalizeStudentId(this.studentName);
+            this.studentId = window.firebaseService.normalizeStudentId(this.studentName, this.studentSection);
         } else {
             this.studentId = 'student_' + this.studentName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
         }
 
         this.attemptAudit.student_name = this.studentName;
+        this.attemptAudit.student_section = this.studentSection;
         this.attemptAudit.student_id = this.studentId;
 
         this.cacheDOM();
@@ -118,7 +124,7 @@ class EnglishQuestEngine {
         // Check target task from URL query parameters (e.g. quiz.html?task=2)
         const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
         const requestedTask = urlParams ? parseInt(urlParams.get('task'), 10) : null;
-        if (requestedTask && requestedTask >= 1 && requestedTask <= 4) {
+        if (requestedTask && requestedTask >= 1 && requestedTask <= 3) {
             this.currentTask = requestedTask;
         }
 
@@ -165,7 +171,6 @@ class EnglishQuestEngine {
             tabTask1: document.getElementById('tabTask1'),
             tabTask2: document.getElementById('tabTask2'),
             tabTask3: document.getElementById('tabTask3'),
-            tabTask4: document.getElementById('tabTask4'),
 
             // Question Navigator Pills
             questionPillsContainer: document.getElementById('questionPillsContainer'),
@@ -236,8 +241,6 @@ class EnglishQuestEngine {
             mapStatusTask2: document.getElementById('mapStatusTask2'),
             mapItemTask3: document.getElementById('mapItemTask3'),
             mapStatusTask3: document.getElementById('mapStatusTask3'),
-            mapItemTask4: document.getElementById('mapItemTask4'),
-            mapStatusTask4: document.getElementById('mapStatusTask4'),
 
             // Anti-Cheat Modal
             antiCheatModal: document.getElementById('antiCheatWarningModal'),
@@ -664,7 +667,7 @@ class EnglishQuestEngine {
             }
         }
 
-        if (attempt && attempt.taskQuestions && attempt.taskQuestions.task1 && attempt.taskQuestions.task1.length === 10 && attempt.taskQuestions.task4 && attempt.taskQuestions.task4.length === 10) {
+        if (attempt && attempt.taskQuestions && attempt.taskQuestions.task1 && attempt.taskQuestions.task1.length === 10 && attempt.taskQuestions.task3 && attempt.taskQuestions.task3.length === 12) {
             this.restoreFromAttempt(attempt);
             this.updateSyncUI('saved', 'Resumed');
             return;
@@ -691,7 +694,7 @@ class EnglishQuestEngine {
 
         try {
             const cloudAttempt = await window.firebaseService.getActiveAttempt(this.studentId, this.studentName);
-            if (cloudAttempt && cloudAttempt.taskQuestions && cloudAttempt.taskQuestions.task1 && cloudAttempt.taskQuestions.task4 && cloudAttempt.taskQuestions.task4.length === 10) {
+            if (cloudAttempt && cloudAttempt.taskQuestions && cloudAttempt.taskQuestions.task1 && cloudAttempt.taskQuestions.task3 && cloudAttempt.taskQuestions.task3.length === 12) {
                 const cloudAnsCount = cloudAttempt.answersMap ? Object.keys(cloudAttempt.answersMap).length : 0;
                 const localAnsCount = this.answersMap ? Object.keys(this.answersMap).length : 0;
 
@@ -710,7 +713,7 @@ class EnglishQuestEngine {
         this.startedAt = attempt.started_at || this.startedAt;
         this.startedAtMs = attempt.started_at_ms || (attempt.started_at ? new Date(attempt.started_at).getTime() : this.startedAtMs);
         this.attemptAudit = attempt.attemptAudit || attempt.attempt_audit || this.attemptAudit;
-        this.currentTask = (typeof attempt.currentTask === 'number' && attempt.currentTask >= 1 && attempt.currentTask <= 4) ? attempt.currentTask : 1;
+        this.currentTask = (typeof attempt.currentTask === 'number' && attempt.currentTask >= 1 && attempt.currentTask <= 3) ? attempt.currentTask : 1;
         this.currentQuestionIndex = (typeof attempt.currentQuestionIndex === 'number' && attempt.currentQuestionIndex >= 0) ? attempt.currentQuestionIndex : 0;
         this.taskQuestions = attempt.taskQuestions;
         this.answersMap = attempt.answersMap || attempt.selected_answers || {};
@@ -743,7 +746,7 @@ class EnglishQuestEngine {
                              ((typeof window !== 'undefined' && window.masterQuestionBank) ? window.masterQuestionBank : 
                              ((typeof global !== 'undefined' && global.masterQuestionBank) ? global.masterQuestionBank : {}));
 
-        ['task1', 'task2', 'task3', 'task4'].forEach(taskKey => {
+        ['task1', 'task2', 'task3'].forEach(taskKey => {
             const raw = questionBank[taskKey] || [];
             const shuffledQ = this.shuffleArray(raw);
             this.attemptAudit.question_order[taskKey] = shuffledQ.map(q => q.question_id);
@@ -855,14 +858,6 @@ class EnglishQuestEngine {
                 count: "12 Questions",
                 xp: "+120 XP Max",
                 passage: "Multiple Language Skills & Culture Items"
-            },
-            4: {
-                icon: "💡",
-                title: "TASK 4<br><span>SYNTHESIZING, COMPOSING, AND EXPRESSING INSIGHTS</span>",
-                focus: "Informative, Persuasive & Argumentative Texts • Composing Insights • Evidence-Based Claims",
-                count: "10 Questions",
-                xp: "+100 XP Max",
-                passage: "Text: The Vital Role of Critical Thinking in the Digital Age"
             }
         };
 
@@ -874,9 +869,12 @@ class EnglishQuestEngine {
         if (this.dom.taskIntroXPCount) this.dom.taskIntroXPCount.textContent = info.xp;
         if (this.dom.taskIntroPassageType) this.dom.taskIntroPassageType.textContent = info.passage;
         if (this.dom.startTaskBtnText) this.dom.startTaskBtnText.textContent = 'START TASK ' + taskNum + ' 🚀';
-
         this.dom.taskIntroModal.classList.remove('hidden');
-        if (typeof window !== "undefined" && window.soundSystem) window.soundSystem.playTaskIntro();
+        try {
+            if (typeof window !== "undefined" && window.soundSystem && typeof window.soundSystem.playTaskIntro === 'function') {
+                window.soundSystem.playTaskIntro();
+            }
+        } catch (e) {}
     }
 
     renderReadingSection(taskKey) {
@@ -936,10 +934,9 @@ class EnglishQuestEngine {
         let overallItemNum = this.currentQuestionIndex + 1;
         if (this.currentTask === 2) overallItemNum += 10;
         if (this.currentTask === 3) overallItemNum += 20;
-        if (this.currentTask === 4) overallItemNum += 32;
 
         if (this.dom.questionTag) {
-            this.dom.questionTag.textContent = 'ITEM ' + itemNum + ' OF ' + totalInTask + ' (TASK ' + this.currentTask + ' • QUESTION #' + overallItemNum + ' OF 42)';
+            this.dom.questionTag.textContent = 'ITEM ' + itemNum + ' OF ' + totalInTask + ' (TASK ' + this.currentTask + ' • QUESTION #' + overallItemNum + ' OF 32)';
         }
         if (this.dom.questionText) this.dom.questionText.innerHTML = q.question_text;
 
@@ -1042,13 +1039,14 @@ class EnglishQuestEngine {
 
     updateHUDProgress(totalInTask) {
         if (!this.dom) return;
-        if (this.dom.hudStudentName) this.dom.hudStudentName.textContent = this.studentName;
+        if (this.dom.hudStudentName) {
+            this.dom.hudStudentName.textContent = this.studentSection ? `${this.studentName} • ${this.studentSection}` : this.studentName;
+        }
         
         const taskTitles = {
             1: "🎯 TASK 1: Understanding Literary Elements",
             2: "🔎 TASK 2: Analyzing & Evaluating Literary Text",
-            3: "✍️ TASK 3: Language, Style, Cohesion & Culture",
-            4: "💡 TASK 4: Synthesizing, Composing & Expressing Insights"
+            3: "✍️ TASK 3: Language, Style, Cohesion & Culture"
         };
         if (this.dom.hudTaskBadge) this.dom.hudTaskBadge.textContent = taskTitles[this.currentTask] || 'TASK ' + this.currentTask;
         if (this.dom.hudTaskProgress) this.dom.hudTaskProgress.textContent = 'Question ' + (this.currentQuestionIndex + 1) + ' of ' + totalInTask;
@@ -1056,9 +1054,8 @@ class EnglishQuestEngine {
         let overallCurrent = this.currentQuestionIndex + 1;
         if (this.currentTask === 2) overallCurrent += 10;
         if (this.currentTask === 3) overallCurrent += 20;
-        if (this.currentTask === 4) overallCurrent += 32;
 
-        const totalOverallQuestions = 42;
+        const totalOverallQuestions = 32;
         if (this.dom.hudOverallProgress) this.dom.hudOverallProgress.textContent = overallCurrent + ' / ' + totalOverallQuestions + ' Questions';
         
         const pct = Math.round((overallCurrent / totalOverallQuestions) * 100);
@@ -1067,7 +1064,7 @@ class EnglishQuestEngine {
 
     updateTaskTabsUI() {
         if (!this.dom) return;
-        [1, 2, 3, 4].forEach(tNum => {
+        [1, 2, 3].forEach(tNum => {
             const tab = this.dom['tabTask' + tNum];
             if (!tab) return;
 
@@ -1173,7 +1170,7 @@ class EnglishQuestEngine {
         let currentStreak = 0;
         let highestStreak = this.maxStreak || 0;
 
-        ['task1', 'task2', 'task3', 'task4'].forEach(taskKey => {
+        ['task1', 'task2', 'task3'].forEach(taskKey => {
             const questions = this.taskQuestions[taskKey] || [];
             let taskCorrect = 0;
             let taskWrong = 0;
@@ -1268,8 +1265,6 @@ class EnglishQuestEngine {
                     this.dom.nextBtnText.textContent = "Complete Task 1 →";
                 } else if (this.currentTask === 2) {
                     this.dom.nextBtnText.textContent = "Complete Task 2 →";
-                } else if (this.currentTask === 3) {
-                    this.dom.nextBtnText.textContent = "Complete Task 3 →";
                 } else {
                     this.dom.nextBtnText.textContent = "Finish Assessment 🚀";
                 }
@@ -1327,6 +1322,8 @@ class EnglishQuestEngine {
             const taskSubmission = {
                 studentId: this.studentId,
                 studentName: this.studentName,
+                section: this.studentSection,
+                studentSection: this.studentSection,
                 taskId: taskNum,
                 taskKey: taskKey,
                 attemptId: this.attemptId,
@@ -1369,7 +1366,7 @@ class EnglishQuestEngine {
                 this.dom.nextBtn.disabled = false;
             }
 
-            if (this.currentTask < 4) {
+            if (this.currentTask < 3) {
                 this.showTaskCompletionMilestone(this.currentTask);
             } else {
                 this.showFinalQuestCompleteModal();
@@ -1384,8 +1381,7 @@ class EnglishQuestEngine {
         const taskTitles = {
             1: "Literary Elements",
             2: "Text Analysis & Evaluation",
-            3: "Language, Style & Culture",
-            4: "Synthesizing & Composing Insights"
+            3: "Language, Style & Culture"
         };
 
         if (this.dom.milestoneHeading) this.dom.milestoneHeading.textContent = "TASK " + taskNum + " COMPLETE!";
@@ -1396,7 +1392,11 @@ class EnglishQuestEngine {
         if (this.dom.continueBtnText) this.dom.continueBtnText.textContent = "CONTINUE TO TASK " + (taskNum + 1) + " 🚀";
 
         this.dom.completionModal.classList.remove('hidden');
-        if (typeof window !== "undefined" && window.soundSystem) window.soundSystem.playMilestone();
+        try {
+            if (typeof window !== "undefined" && window.soundSystem && typeof window.soundSystem.playMilestone === 'function') {
+                window.soundSystem.playMilestone();
+            }
+        } catch (e) {}
     }
 
     showFinalQuestCompleteModal() {
@@ -1406,25 +1406,29 @@ class EnglishQuestEngine {
         }
 
         const answeredCount = Object.keys(this.answersMap).length;
-        if (this.dom.finalModalScore) this.dom.finalModalScore.textContent = answeredCount + " / 42";
+        if (this.dom.finalModalScore) this.dom.finalModalScore.textContent = answeredCount + " / 32";
         if (this.dom.finalModalXP) this.dom.finalModalXP.textContent = "+" + (this.score * 10) + " XP";
         if (this.dom.finalModalStreak) this.dom.finalModalStreak.textContent = "x" + this.maxStreak;
 
         this.dom.finalQuestCompleteModal.classList.remove('hidden');
-        if (typeof window !== "undefined" && window.soundSystem) window.soundSystem.playVictory();
+        try {
+            if (typeof window !== "undefined" && window.soundSystem && typeof window.soundSystem.playVictory === 'function') {
+                window.soundSystem.playVictory();
+            }
+        } catch (e) {}
     }
 
     openQuestMapModal() {
         if (!this.dom || !this.dom.questMapModal) return;
 
         if (this.dom.mapStudentName) this.dom.mapStudentName.textContent = this.studentName;
-        if (this.dom.mapTotalXP) this.dom.mapTotalXP.textContent = this.earnedXP + ' / 420 XP';
+        if (this.dom.mapTotalXP) this.dom.mapTotalXP.textContent = this.earnedXP + ' / 320 XP';
         
         const m = Math.floor(this.timeRemaining / 60);
         const s = this.timeRemaining % 60;
         if (this.dom.mapTimeLeft) this.dom.mapTimeLeft.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
 
-        [1, 2, 3, 4].forEach(tNum => {
+        [1, 2, 3].forEach(tNum => {
             const item = this.dom['mapItemTask' + tNum];
             const status = this.dom['mapStatusTask' + tNum];
             if (!item || !status) return;
@@ -1519,6 +1523,8 @@ class EnglishQuestEngine {
 
         const resultPayload = {
             studentName: this.studentName,
+            studentSection: this.studentSection,
+            section: this.studentSection,
             studentId: this.studentId,
             attemptId: this.attemptId,
 
@@ -1537,14 +1543,9 @@ class EnglishQuestEngine {
             task3Wrong: this.taskScores.task3.wrong,
             task3Unanswered: this.taskScores.task3.unanswered,
 
-            task4Score: this.taskScores.task4.score,
-            task4Correct: this.taskScores.task4.correct,
-            task4Wrong: this.taskScores.task4.wrong,
-            task4Unanswered: this.taskScores.task4.unanswered,
-
             totalScore: this.score,
-            totalQuestions: 42,
-            percentage: Number(((this.score / 42) * 100).toFixed(2)),
+            totalQuestions: 32,
+            percentage: Number(((this.score / 32) * 100).toFixed(2)),
             earnedXP: this.earnedXP,
             maxStreak: this.maxStreak,
             timeUsed: this.totalTimeUsed,
@@ -1583,6 +1584,8 @@ class EnglishQuestEngine {
                     const taskSub = {
                         studentId: this.studentId,
                         studentName: this.studentName,
+                        section: this.studentSection,
+                        studentSection: this.studentSection,
                         taskId: tNum,
                         taskKey: taskKey,
                         attemptId: this.attemptId,

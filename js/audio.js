@@ -78,6 +78,31 @@ class SoundSystem {
         this.playTone(800, 'triangle', 0.04, 0.00, 0.08);
     }
 
+    playClick() {
+        // Subtle UI interaction click
+        this.playTone(600, 'sine', 0.05, 0.00, 0.10);
+    }
+
+    playTaskIntro() {
+        // Welcoming quest chord: G4 -> C5 -> E5
+        this.playTone(392.00, 'sine', 0.15, 0.00, 0.12);
+        this.playTone(523.25, 'sine', 0.15, 0.08, 0.14);
+        this.playTone(659.25, 'triangle', 0.30, 0.16, 0.16);
+    }
+
+    playMilestone() {
+        // Exciting mid-quest level up fanfare
+        this.playTone(523.25, 'triangle', 0.15, 0.00, 0.15);
+        this.playTone(659.25, 'triangle', 0.15, 0.10, 0.15);
+        this.playTone(783.99, 'sine', 0.20, 0.20, 0.18);
+        this.playTone(1046.50, 'sine', 0.40, 0.32, 0.22);
+    }
+
+    playVictory() {
+        // Grand victory fanfare
+        this.playQuizComplete();
+    }
+
     playStreak() {
         // Sparkle sweep for high streaks
         this.playTone(587.33, 'sine', 0.1, 0.00, 0.12);
@@ -103,3 +128,4 @@ class SoundSystem {
 }
 
 window.soundSystem = new SoundSystem();
+
