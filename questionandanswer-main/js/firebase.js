@@ -271,19 +271,11 @@ class FirebaseService {
         if (this.initialized && this.auth) {
             return await this.auth.signInWithEmailAndPassword(email, password);
         } else {
-            if (email === 'teacher@school.edu' && password === 'english10pass' ||
-                email === 'teacher@english10.edu' && password === 'teacher123') {
-                const mockUser = { email: email, uid: 'mock_teacher_123' };
-                sessionStorage.setItem('english10_teacher_user', JSON.stringify(mockUser));
-                return { user: mockUser };
-            } else {
-                throw new Error('Invalid email or password. Please verify your credentials and try again.');
-            }
+            throw new Error('Authentication service is currently unavailable. Please verify Firebase configuration.');
         }
     }
 
     async teacherSignOut() {
-        sessionStorage.removeItem('english10_teacher_user');
         if (this.initialized && this.auth) {
             return await this.auth.signOut();
         }
@@ -293,7 +285,7 @@ class FirebaseService {
         if (this.initialized && this.auth) {
             return await this.auth.sendPasswordResetEmail(email);
         } else {
-            return true;
+            throw new Error('Authentication service is currently unavailable.');
         }
     }
 
@@ -301,8 +293,7 @@ class FirebaseService {
         if (this.initialized && this.auth) {
             this.auth.onAuthStateChanged(callback);
         } else {
-            const mockUserStr = sessionStorage.getItem('english10_teacher_user');
-            callback(mockUserStr ? JSON.parse(mockUserStr) : null);
+            callback(null);
         }
     }
 }

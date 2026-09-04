@@ -1,7 +1,7 @@
-﻿/**
+/**
  * TEACHER AUTHENTICATION CONTROLLER
  * Supports Firebase Authentication (Email/Password), session validation,
- * password reset requests, and offline demonstration accounts.
+ * and password reset requests.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
