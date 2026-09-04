@@ -20,11 +20,12 @@ class EnglishQuestEngine {
                                 ((typeof readingMaterials !== 'undefined') ? readingMaterials : 
                                 ((typeof window !== 'undefined' && (window.READING_PASSAGES || window.readingMaterials)) || {}));
 
-        // Questions structure (10 in Task 1, 10 in Task 2, 12 in Task 3)
+        // Questions structure (10 in Task 1, 10 in Task 2, 12 in Task 3, 10 in Task 4)
         this.taskQuestions = {
             task1: [],
             task2: [],
-            task3: []
+            task3: [],
+            task4: []
         };
         this.currentQuestion = null;
         this.selectedOptionId = null;
@@ -38,8 +39,8 @@ class EnglishQuestEngine {
         this.answersMap = {};
 
         // Gamification & Scores
-        this.score = 0;             // Total correct count (0..32)
-        this.earnedXP = 0;          // Total XP (0..320)
+        this.score = 0;             // Total correct count (0..42)
+        this.earnedXP = 0;          // Total XP (0..420)
         this.streak = 0;            // Current consecutive correct streak
         this.maxStreak = 0;         // Best streak achieved
         
@@ -47,11 +48,12 @@ class EnglishQuestEngine {
         this.taskScores = {
             task1: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 10, completed: false },
             task2: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 10, completed: false },
-            task3: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 12, completed: false }
+            task3: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 12, completed: false },
+            task4: { correct: 0, wrong: 0, unanswered: 0, score: 0, xp: 0, total: 10, completed: false }
         };
 
-        // 30-Minute Quest Challenge Timer (1800 seconds total)
-        this.totalDurationSeconds = (typeof QUIZ_CONFIG !== "undefined" && QUIZ_CONFIG.overallTimerSeconds) || 1800;
+        // 42-Minute Quest Challenge Timer (2520 seconds total)
+        this.totalDurationSeconds = (typeof QUIZ_CONFIG !== "undefined" && QUIZ_CONFIG.overallTimerSeconds) || 2520;
         this.timeRemaining = this.totalDurationSeconds;
         this.totalTimeUsed = 0;
         this.timer = null;
@@ -62,8 +64,8 @@ class EnglishQuestEngine {
             student_name: "",
             student_id: "",
             started_at: this.startedAt,
-            task_order: [1, 2, 3],
-            question_order: { task1: [], task2: [], task3: [] },
+            task_order: [1, 2, 3, 4],
+            question_order: { task1: [], task2: [], task3: [], task4: [] },
             option_order: {},
             selected_answers: {}
         };
@@ -116,7 +118,7 @@ class EnglishQuestEngine {
         // Check target task from URL query parameters (e.g. quiz.html?task=2)
         const urlParams = (typeof window !== 'undefined' && window.location) ? new URLSearchParams(window.location.search) : null;
         const requestedTask = urlParams ? parseInt(urlParams.get('task'), 10) : null;
-        if (requestedTask && requestedTask >= 1 && requestedTask <= 3) {
+        if (requestedTask && requestedTask >= 1 && requestedTask <= 4) {
             this.currentTask = requestedTask;
         }
 
@@ -163,6 +165,7 @@ class EnglishQuestEngine {
             tabTask1: document.getElementById('tabTask1'),
             tabTask2: document.getElementById('tabTask2'),
             tabTask3: document.getElementById('tabTask3'),
+            tabTask4: document.getElementById('tabTask4'),
 
             // Question Navigator Pills
             questionPillsContainer: document.getElementById('questionPillsContainer'),
@@ -213,7 +216,7 @@ class EnglishQuestEngine {
             continueBtn: document.getElementById('continueToNextTaskBtn'),
             continueBtnText: document.getElementById('continueBtnText'),
 
-            // Final Quest Complete Modal (32/32 items)
+            // Final Quest Complete Modal (42/42 items)
             finalQuestCompleteModal: document.getElementById('finalQuestCompleteModal'),
             finalModalScore: document.getElementById('finalModalScore'),
             finalModalXP: document.getElementById('finalModalXP'),
@@ -233,6 +236,8 @@ class EnglishQuestEngine {
             mapStatusTask2: document.getElementById('mapStatusTask2'),
             mapItemTask3: document.getElementById('mapItemTask3'),
             mapStatusTask3: document.getElementById('mapStatusTask3'),
+            mapItemTask4: document.getElementById('mapItemTask4'),
+            mapStatusTask4: document.getElementById('mapStatusTask4'),
 
             // Anti-Cheat Modal
             antiCheatModal: document.getElementById('antiCheatWarningModal'),
@@ -259,7 +264,7 @@ class EnglishQuestEngine {
         }
 
         // Task Nav Tabs (Direct Navigation)
-        [1, 2, 3].forEach(tNum => {
+        [1, 2, 3, 4].forEach(tNum => {
             const tab = this.dom['tabTask' + tNum];
             if (tab) {
                 tab.addEventListener('click', () => this.handleTaskTabClick(tNum));
@@ -267,7 +272,7 @@ class EnglishQuestEngine {
         });
 
         // Quest Map Task Items
-        [1, 2, 3].forEach(tNum => {
+        [1, 2, 3, 4].forEach(tNum => {
             const mapItem = this.dom['mapItemTask' + tNum];
             if (mapItem) {
                 mapItem.style.cursor = 'pointer';
@@ -304,11 +309,11 @@ class EnglishQuestEngine {
             });
         }
 
-        // Milestone Continue Action (Task 1 -> 2 or Task 2 -> 3)
+        // Milestone Continue Action (Task 1 -> 2 -> 3 -> 4 or Finish)
         if (this.dom.continueBtn) {
             this.dom.continueBtn.addEventListener('click', () => {
                 if (this.dom.completionModal) this.dom.completionModal.classList.add('hidden');
-                if (this.currentTask < 3) {
+                if (this.currentTask < 4) {
                     this.currentTask++;
                     this.currentQuestionIndex = 0;
                     this.renderReadingSection('task' + this.currentTask);
@@ -446,7 +451,7 @@ class EnglishQuestEngine {
             }
 
             // Also check local storage backups
-            [1, 2, 3].forEach(tNum => {
+            [1, 2, 3, 4].forEach(tNum => {
                 if (!submissions['task' + tNum]) {
                     const localSub = localStorage.getItem('english10_task_submission_' + this.studentId + '_task' + tNum);
                     if (localSub) {
@@ -455,8 +460,8 @@ class EnglishQuestEngine {
                 }
             });
 
-            // If all 3 tasks are already submitted, lock entirely
-            const allDone = [1, 2, 3].every(tNum => Boolean(submissions['task' + tNum]));
+            // If all 4 tasks are already submitted, lock entirely
+            const allDone = [1, 2, 3, 4].every(tNum => Boolean(submissions['task' + tNum]));
             if (allDone) {
                 if (this.dom && this.dom.verificationLoader) this.dom.verificationLoader.classList.add('hidden');
                 this.showTaskLockedScreen('all', {
@@ -487,14 +492,24 @@ class EnglishQuestEngine {
                     this.currentTask = 2;
                 }
             }
+            // If requested Task 4, but Task 1, 2, or 3 is not submitted, route to earliest uncompleted task
+            if (this.currentTask === 4) {
+                if (!submissions['task1']) {
+                    this.currentTask = 1;
+                } else if (!submissions['task2']) {
+                    this.currentTask = 2;
+                } else if (!submissions['task3']) {
+                    this.currentTask = 3;
+                }
+            }
 
             // Populate already submitted task scores into taskScores if any
-            [1, 2, 3].forEach(tNum => {
+            [1, 2, 3, 4].forEach(tNum => {
                 const sub = submissions['task' + tNum];
                 if (sub) {
                     this.taskScores['task' + tNum] = {
                         correct: sub.correctCount !== undefined ? sub.correctCount : (sub.score || 0),
-                        wrong: sub.wrongCount !== undefined ? sub.wrongCount : ((sub.totalQuestions || 10) - (sub.score || 0)),
+                        wrong: sub.wrongCount !== undefined ? sub.wrongCount : ((sub.totalQuestions || (tNum === 3 ? 12 : 10)) - (sub.score || 0)),
                         unanswered: sub.unansweredCount || 0,
                         score: sub.score || 0,
                         xp: sub.xp || (sub.score * 10),
@@ -649,7 +664,7 @@ class EnglishQuestEngine {
             }
         }
 
-        if (attempt && attempt.taskQuestions && attempt.taskQuestions.task1 && attempt.taskQuestions.task1.length === 10) {
+        if (attempt && attempt.taskQuestions && attempt.taskQuestions.task1 && attempt.taskQuestions.task1.length === 10 && attempt.taskQuestions.task4 && attempt.taskQuestions.task4.length === 10) {
             this.restoreFromAttempt(attempt);
             this.updateSyncUI('saved', 'Resumed');
             return;
@@ -676,7 +691,7 @@ class EnglishQuestEngine {
 
         try {
             const cloudAttempt = await window.firebaseService.getActiveAttempt(this.studentId, this.studentName);
-            if (cloudAttempt && cloudAttempt.taskQuestions && cloudAttempt.taskQuestions.task1 && cloudAttempt.taskQuestions.task1.length === 10) {
+            if (cloudAttempt && cloudAttempt.taskQuestions && cloudAttempt.taskQuestions.task1 && cloudAttempt.taskQuestions.task4 && cloudAttempt.taskQuestions.task4.length === 10) {
                 const cloudAnsCount = cloudAttempt.answersMap ? Object.keys(cloudAttempt.answersMap).length : 0;
                 const localAnsCount = this.answersMap ? Object.keys(this.answersMap).length : 0;
 
@@ -695,7 +710,7 @@ class EnglishQuestEngine {
         this.startedAt = attempt.started_at || this.startedAt;
         this.startedAtMs = attempt.started_at_ms || (attempt.started_at ? new Date(attempt.started_at).getTime() : this.startedAtMs);
         this.attemptAudit = attempt.attemptAudit || attempt.attempt_audit || this.attemptAudit;
-        this.currentTask = (typeof attempt.currentTask === 'number' && attempt.currentTask >= 1 && attempt.currentTask <= 3) ? attempt.currentTask : 1;
+        this.currentTask = (typeof attempt.currentTask === 'number' && attempt.currentTask >= 1 && attempt.currentTask <= 4) ? attempt.currentTask : 1;
         this.currentQuestionIndex = (typeof attempt.currentQuestionIndex === 'number' && attempt.currentQuestionIndex >= 0) ? attempt.currentQuestionIndex : 0;
         this.taskQuestions = attempt.taskQuestions;
         this.answersMap = attempt.answersMap || attempt.selected_answers || {};
@@ -728,7 +743,7 @@ class EnglishQuestEngine {
                              ((typeof window !== 'undefined' && window.masterQuestionBank) ? window.masterQuestionBank : 
                              ((typeof global !== 'undefined' && global.masterQuestionBank) ? global.masterQuestionBank : {}));
 
-        ['task1', 'task2', 'task3'].forEach(taskKey => {
+        ['task1', 'task2', 'task3', 'task4'].forEach(taskKey => {
             const raw = questionBank[taskKey] || [];
             const shuffledQ = this.shuffleArray(raw);
             this.attemptAudit.question_order[taskKey] = shuffledQ.map(q => q.question_id);
@@ -840,6 +855,14 @@ class EnglishQuestEngine {
                 count: "12 Questions",
                 xp: "+120 XP Max",
                 passage: "Multiple Language Skills & Culture Items"
+            },
+            4: {
+                icon: "💡",
+                title: "TASK 4<br><span>SYNTHESIZING, COMPOSING, AND EXPRESSING INSIGHTS</span>",
+                focus: "Informative, Persuasive & Argumentative Texts • Composing Insights • Evidence-Based Claims",
+                count: "10 Questions",
+                xp: "+100 XP Max",
+                passage: "Text: The Vital Role of Critical Thinking in the Digital Age"
             }
         };
 
@@ -913,9 +936,10 @@ class EnglishQuestEngine {
         let overallItemNum = this.currentQuestionIndex + 1;
         if (this.currentTask === 2) overallItemNum += 10;
         if (this.currentTask === 3) overallItemNum += 20;
+        if (this.currentTask === 4) overallItemNum += 32;
 
         if (this.dom.questionTag) {
-            this.dom.questionTag.textContent = 'ITEM ' + itemNum + ' OF ' + totalInTask + ' (TASK ' + this.currentTask + ' • QUESTION #' + overallItemNum + ' OF 32)';
+            this.dom.questionTag.textContent = 'ITEM ' + itemNum + ' OF ' + totalInTask + ' (TASK ' + this.currentTask + ' • QUESTION #' + overallItemNum + ' OF 42)';
         }
         if (this.dom.questionText) this.dom.questionText.innerHTML = q.question_text;
 
@@ -1023,7 +1047,8 @@ class EnglishQuestEngine {
         const taskTitles = {
             1: "🎯 TASK 1: Understanding Literary Elements",
             2: "🔎 TASK 2: Analyzing & Evaluating Literary Text",
-            3: "✍️ TASK 3: Language, Style, Cohesion & Culture"
+            3: "✍️ TASK 3: Language, Style, Cohesion & Culture",
+            4: "💡 TASK 4: Synthesizing, Composing & Expressing Insights"
         };
         if (this.dom.hudTaskBadge) this.dom.hudTaskBadge.textContent = taskTitles[this.currentTask] || 'TASK ' + this.currentTask;
         if (this.dom.hudTaskProgress) this.dom.hudTaskProgress.textContent = 'Question ' + (this.currentQuestionIndex + 1) + ' of ' + totalInTask;
@@ -1031,8 +1056,9 @@ class EnglishQuestEngine {
         let overallCurrent = this.currentQuestionIndex + 1;
         if (this.currentTask === 2) overallCurrent += 10;
         if (this.currentTask === 3) overallCurrent += 20;
+        if (this.currentTask === 4) overallCurrent += 32;
 
-        const totalOverallQuestions = 32;
+        const totalOverallQuestions = 42;
         if (this.dom.hudOverallProgress) this.dom.hudOverallProgress.textContent = overallCurrent + ' / ' + totalOverallQuestions + ' Questions';
         
         const pct = Math.round((overallCurrent / totalOverallQuestions) * 100);
@@ -1041,7 +1067,7 @@ class EnglishQuestEngine {
 
     updateTaskTabsUI() {
         if (!this.dom) return;
-        [1, 2, 3].forEach(tNum => {
+        [1, 2, 3, 4].forEach(tNum => {
             const tab = this.dom['tabTask' + tNum];
             if (!tab) return;
 
@@ -1147,7 +1173,7 @@ class EnglishQuestEngine {
         let currentStreak = 0;
         let highestStreak = this.maxStreak || 0;
 
-        ['task1', 'task2', 'task3'].forEach(taskKey => {
+        ['task1', 'task2', 'task3', 'task4'].forEach(taskKey => {
             const questions = this.taskQuestions[taskKey] || [];
             let taskCorrect = 0;
             let taskWrong = 0;
@@ -1242,6 +1268,8 @@ class EnglishQuestEngine {
                     this.dom.nextBtnText.textContent = "Complete Task 1 →";
                 } else if (this.currentTask === 2) {
                     this.dom.nextBtnText.textContent = "Complete Task 2 →";
+                } else if (this.currentTask === 3) {
+                    this.dom.nextBtnText.textContent = "Complete Task 3 →";
                 } else {
                     this.dom.nextBtnText.textContent = "Finish Assessment 🚀";
                 }
@@ -1341,7 +1369,7 @@ class EnglishQuestEngine {
                 this.dom.nextBtn.disabled = false;
             }
 
-            if (this.currentTask < 3) {
+            if (this.currentTask < 4) {
                 this.showTaskCompletionMilestone(this.currentTask);
             } else {
                 this.showFinalQuestCompleteModal();
@@ -1356,7 +1384,8 @@ class EnglishQuestEngine {
         const taskTitles = {
             1: "Literary Elements",
             2: "Text Analysis & Evaluation",
-            3: "Language, Style & Culture"
+            3: "Language, Style & Culture",
+            4: "Synthesizing & Composing Insights"
         };
 
         if (this.dom.milestoneHeading) this.dom.milestoneHeading.textContent = "TASK " + taskNum + " COMPLETE!";
@@ -1377,7 +1406,7 @@ class EnglishQuestEngine {
         }
 
         const answeredCount = Object.keys(this.answersMap).length;
-        if (this.dom.finalModalScore) this.dom.finalModalScore.textContent = answeredCount + " / 32";
+        if (this.dom.finalModalScore) this.dom.finalModalScore.textContent = answeredCount + " / 42";
         if (this.dom.finalModalXP) this.dom.finalModalXP.textContent = "+" + (this.score * 10) + " XP";
         if (this.dom.finalModalStreak) this.dom.finalModalStreak.textContent = "x" + this.maxStreak;
 
@@ -1389,13 +1418,13 @@ class EnglishQuestEngine {
         if (!this.dom || !this.dom.questMapModal) return;
 
         if (this.dom.mapStudentName) this.dom.mapStudentName.textContent = this.studentName;
-        if (this.dom.mapTotalXP) this.dom.mapTotalXP.textContent = this.earnedXP + ' / 320 XP';
+        if (this.dom.mapTotalXP) this.dom.mapTotalXP.textContent = this.earnedXP + ' / 420 XP';
         
         const m = Math.floor(this.timeRemaining / 60);
         const s = this.timeRemaining % 60;
         if (this.dom.mapTimeLeft) this.dom.mapTimeLeft.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
 
-        [1, 2, 3].forEach(tNum => {
+        [1, 2, 3, 4].forEach(tNum => {
             const item = this.dom['mapItemTask' + tNum];
             const status = this.dom['mapStatusTask' + tNum];
             if (!item || !status) return;
@@ -1508,9 +1537,14 @@ class EnglishQuestEngine {
             task3Wrong: this.taskScores.task3.wrong,
             task3Unanswered: this.taskScores.task3.unanswered,
 
+            task4Score: this.taskScores.task4.score,
+            task4Correct: this.taskScores.task4.correct,
+            task4Wrong: this.taskScores.task4.wrong,
+            task4Unanswered: this.taskScores.task4.unanswered,
+
             totalScore: this.score,
-            totalQuestions: 32,
-            percentage: Number(((this.score / 32) * 100).toFixed(2)),
+            totalQuestions: 42,
+            percentage: Number(((this.score / 42) * 100).toFixed(2)),
             earnedXP: this.earnedXP,
             maxStreak: this.maxStreak,
             timeUsed: this.totalTimeUsed,
@@ -1536,7 +1570,7 @@ class EnglishQuestEngine {
         if (typeof window !== "undefined" && window.firebaseService) {
             try {
                 // Ensure each task submission is recorded
-                for (let tNum = 1; tNum <= 3; tNum++) {
+                for (let tNum = 1; tNum <= 4; tNum++) {
                     const taskKey = 'task' + tNum;
                     const taskScoreData = this.taskScores[taskKey];
                     const taskAnswers = {};

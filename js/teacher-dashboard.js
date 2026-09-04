@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TEACHER DASHBOARD CONTROLLER
  * Real-time results retrieval, KPI calculations, search, filters,
  * column sorting, student drill-down modal, official answer key viewer, and CSV export.
@@ -175,6 +175,9 @@ class TeacherDashboard {
             } else if (field === 't3') {
                 valA = a.task3Score || 0;
                 valB = b.task3Score || 0;
+            } else if (field === 't4') {
+                valA = a.task4Score || 0;
+                valB = b.task4Score || 0;
             } else if (typeof valA === 'string') {
                 valA = valA.toLowerCase();
                 valB = (valB || '').toLowerCase();
@@ -213,7 +216,7 @@ class TeacherDashboard {
         if (this.filteredResults.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; padding: 3rem; color: #64748b;">
+                    <td colspan="9" style="text-align: center; padding: 3rem; color: #64748b;">
                         🔍 No student submissions match the current search or filters.
                     </td>
                 </tr>
@@ -236,7 +239,8 @@ class TeacherDashboard {
                 <td class="text-center">${r.task1Score || 0}/10</td>
                 <td class="text-center">${r.task2Score || 0}/10</td>
                 <td class="text-center">${r.task3Score || 0}/12</td>
-                <td class="text-center" style="font-weight: 800;">${r.totalScore || 0}/32</td>
+                <td class="text-center">${r.task4Score || 0}/10</td>
+                <td class="text-center" style="font-weight: 800;">${r.totalScore || 0}/42</td>
                 <td class="text-center"><span class="pill-pct ${pillClass}">${p}%</span></td>
                 <td class="text-muted" style="font-size: 0.85rem;">${dateStr}</td>
                 <td class="text-center">
@@ -258,7 +262,7 @@ class TeacherDashboard {
         if (!modal) return;
 
         document.getElementById('modalStudentName').textContent = r.studentName || 'N/A';
-        document.getElementById('modalFinalScore').textContent = `${r.totalScore || 0} / 32`;
+        document.getElementById('modalFinalScore').textContent = `${r.totalScore || 0} / 42`;
         document.getElementById('modalPercentage').textContent = `${Math.round(r.percentage || 0)}%`;
 
         document.getElementById('modalT1Score').textContent = `${r.task1Score || 0} / 10`;
@@ -269,6 +273,11 @@ class TeacherDashboard {
 
         document.getElementById('modalT3Score').textContent = `${r.task3Score || 0} / 12`;
         document.getElementById('modalT3Breakdown').textContent = `Correct: ${r.task3Correct || 0} | Wrong: ${r.task3Wrong || 0} | Unanswered: ${r.task3Unanswered || 0}`;
+
+        const t4ScoreEl = document.getElementById('modalT4Score');
+        if (t4ScoreEl) t4ScoreEl.textContent = `${r.task4Score || 0} / 10`;
+        const t4BreakdownEl = document.getElementById('modalT4Breakdown');
+        if (t4BreakdownEl) t4BreakdownEl.textContent = `Correct: ${r.task4Correct || 0} | Wrong: ${r.task4Wrong || 0} | Unanswered: ${r.task4Unanswered || 0}`;
 
         const mins = Math.floor((r.timeUsed || 0) / 60);
         const secs = (r.timeUsed || 0) % 60;
@@ -291,13 +300,14 @@ class TeacherDashboard {
             return;
         }
 
-        const headers = ['Student Name', 'Task 1 (/10)', 'Task 2 (/10)', 'Task 3 (/12)', 'Total Score (/32)', 'Percentage (%)', 'Time Used (seconds)', 'Auto Submitted', 'Date Completed'];
+        const headers = ['Student Name', 'Task 1 (/10)', 'Task 2 (/10)', 'Task 3 (/12)', 'Task 4 (/10)', 'Total Score (/42)', 'Percentage (%)', 'Time Used (seconds)', 'Auto Submitted', 'Date Completed'];
 
         const rows = this.filteredResults.map(r => [
             `"${(r.studentName || '').replace(/"/g, '""')}"`,
             r.task1Score || 0,
             r.task2Score || 0,
             r.task3Score || 0,
+            r.task4Score || 0,
             r.totalScore || 0,
             r.percentage || 0,
             r.timeUsed || 0,

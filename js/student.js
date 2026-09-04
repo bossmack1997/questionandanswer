@@ -102,7 +102,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             let targetTask = 1;
             if (studentSubmissions[1] && !studentSubmissions[2]) targetTask = 2;
             else if (studentSubmissions[1] && studentSubmissions[2] && !studentSubmissions[3]) targetTask = 3;
-            else if (studentSubmissions[1] && studentSubmissions[2] && studentSubmissions[3]) {
+            else if (studentSubmissions[1] && studentSubmissions[2] && studentSubmissions[3] && !studentSubmissions[4]) targetTask = 4;
+            else if (studentSubmissions[1] && studentSubmissions[2] && studentSubmissions[3] && studentSubmissions[4]) {
                 window.location.href = 'result.html';
                 return;
             }
@@ -120,7 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         hideError();
         const studentId = window.firebaseService ? window.firebaseService.normalizeStudentId(name) : ('student_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_'));
         
-        // 1. Fetch all completed task submissions from Firestore / LocalStorage
+        // 1. Fetch all completed task submissions from Firestore / LocalStorage (Tasks 1..4)
         try {
             if (window.firebaseService) {
                 studentSubmissions = await window.firebaseService.getAllTaskSubmissionsForStudent(studentId);
@@ -130,7 +131,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Fallback local checks if offline
-        for (let t = 1; t <= 3; t++) {
+        for (let t = 1; t <= 4; t++) {
             if (!studentSubmissions[t]) {
                 const localSub = localStorage.getItem('english10_sub_' + studentId + '_task' + t);
                 if (localSub) {
@@ -165,8 +166,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateBriefingUI(name, attempt, submissions) {
         welcomeStudentName.textContent = name;
 
-        // Update Roadmap Step Cards (Tasks 1, 2, 3)
-        const totalTasks = 3;
+        // Update Roadmap Step Cards (Tasks 1, 2, 3, 4)
+        const totalTasks = 4;
         let completedCount = 0;
         let totalScore = 0;
         let totalQuestions = 0;
@@ -253,11 +254,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const currentTask = attempt.currentTask || 1;
                 const xp = attempt.earnedXP || (attempt.score ? attempt.score * 10 : 0);
 
-                let timeRemainingSec = 1800;
+                let timeRemainingSec = 2520;
                 if (attempt.started_at_ms || attempt.started_at) {
                     const startMs = attempt.started_at_ms || new Date(attempt.started_at).getTime();
                     const elapsedSec = Math.floor((Date.now() - startMs) / 1000);
-                    timeRemainingSec = Math.max(0, 1800 - elapsedSec);
+                    timeRemainingSec = Math.max(0, 2520 - elapsedSec);
                 } else if (typeof attempt.timeRemaining === 'number') {
                     timeRemainingSec = attempt.timeRemaining;
                 }
@@ -267,7 +268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const formattedTime = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
 
                 if (resumeTaskName) resumeTaskName.textContent = 'Task ' + currentTask;
-                if (resumeProgress) resumeProgress.textContent = answeredCount + ' / 32';
+                if (resumeProgress) resumeProgress.textContent = answeredCount + ' / 42';
                 if (resumeXP) resumeXP.textContent = xp + ' XP';
                 if (resumeTimeLeft) resumeTimeLeft.textContent = formattedTime;
 
@@ -283,6 +284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let nextTask = 1;
                 if (submissions && submissions[1] && !submissions[2]) nextTask = 2;
                 else if (submissions && submissions[1] && submissions[2] && !submissions[3]) nextTask = 3;
+                else if (submissions && submissions[1] && submissions[2] && submissions[3] && !submissions[4]) nextTask = 4;
 
                 if (startBtnText) startBtnText.textContent = 'START TASK ' + nextTask;
                 if (startBtnIcon) startBtnIcon.textContent = '🔥';

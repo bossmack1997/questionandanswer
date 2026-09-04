@@ -16,9 +16,9 @@
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/student.css" />
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   </head>
   <body class="student-page-body">
     <div class="bg-shape shape-1"></div>
@@ -106,7 +106,7 @@
               <span class="attempt-stat-lbl">Current Stage</span>
             </div>
             <div class="attempt-stat">
-              <span class="attempt-stat-val" id="resumeProgress">0 / 32</span>
+              <span class="attempt-stat-val" id="resumeProgress">0 / 42</span>
               <span class="attempt-stat-lbl">Answered</span>
             </div>
             <div class="attempt-stat">
@@ -114,7 +114,7 @@
               <span class="attempt-stat-lbl">Earned XP</span>
             </div>
             <div class="attempt-stat">
-              <span class="attempt-stat-val" id="resumeTimeLeft">30:00</span>
+              <span class="attempt-stat-val" id="resumeTimeLeft">42:00</span>
               <span class="attempt-stat-lbl">Time Left</span>
             </div>
           </div>
@@ -124,22 +124,22 @@
         <div class="quest-specs-grid" id="questSpecsGrid">
           <div class="spec-card">
             <span class="spec-icon">🎯</span>
-            <span class="spec-val">3 Tasks</span>
+            <span class="spec-val">4 Tasks</span>
             <span class="spec-lbl">Quest Chapters</span>
           </div>
           <div class="spec-card">
             <span class="spec-icon">📝</span>
-            <span class="spec-val">32 Questions</span>
+            <span class="spec-val">42 Questions</span>
             <span class="spec-lbl">Total Items</span>
           </div>
           <div class="spec-card">
             <span class="spec-icon">⭐</span>
-            <span class="spec-val">320 XP</span>
+            <span class="spec-val">420 XP</span>
             <span class="spec-lbl">Max Score</span>
           </div>
           <div class="spec-card">
             <span class="spec-icon">⏱️</span>
-            <span class="spec-val">30 Mins</span>
+            <span class="spec-val">42 Mins</span>
             <span class="spec-lbl">Challenge Timer</span>
           </div>
         </div>
@@ -205,7 +205,7 @@
                     Language, Style, Cohesion & Culture
                   </h4>
                   <span class="step-status-tag status-locked" id="mapStepTag3"
-                    >🔒 FINAL STAGE</span
+                    >🔒 UNLOCKS NEXT</span
                   >
                 </div>
                 <p class="step-desc" id="mapStepDesc3">
@@ -214,6 +214,26 @@
                 <div class="step-score-info hidden" id="mapStepScore3"></div>
               </div>
               <div class="step-action-col" id="mapStepAction3"></div>
+            </div>
+
+            <div class="map-connector">↓</div>
+
+            <!-- Step 4 -->
+            <div class="map-step-card step-locked" id="mapStep4" data-task="4">
+              <div class="step-badge">4</div>
+              <div class="step-info">
+                <div class="step-header">
+                  <h4 class="step-title">Synthesizing & Expressing Insights</h4>
+                  <span class="step-status-tag status-locked" id="mapStepTag4"
+                    >🔒 FINAL STAGE</span
+                  >
+                </div>
+                <p class="step-desc" id="mapStepDesc4">
+                  10 Questions • Synthesizing Texts, Evidence & Critical Claims
+                </p>
+                <div class="step-score-info hidden" id="mapStepScore4"></div>
+              </div>
+              <div class="step-action-col" id="mapStepAction4"></div>
             </div>
           </div>
 

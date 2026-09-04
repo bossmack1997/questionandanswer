@@ -16,9 +16,9 @@
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/quiz.css" />
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   </head>
   <body class="result-body">
     <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
@@ -47,7 +47,7 @@
         <section class="final-score-banner" aria-label="Score Overview">
           <div class="score-banner-item">
             <span class="score-banner-label">FINAL SCORE</span>
-            <span id="resFinalScore" class="score-banner-value">0 / 32</span>
+            <span id="resFinalScore" class="score-banner-value">0 / 42</span>
           </div>
           <div class="score-banner-divider"></div>
           <div class="score-banner-item">
@@ -79,7 +79,7 @@
 
         <hr class="result-separator" />
 
-        <!-- Task Breakdown Cards (Tasks 1, 2, 3) -->
+        <!-- Task Breakdown Cards (Tasks 1, 2, 3, 4) -->
         <h3 class="breakdown-title">📊 TASK PERFORMANCE BREAKDOWN</h3>
         <section class="task-results-grid" aria-label="Task Breakdown">
           <div class="task-result-box">
@@ -114,6 +114,18 @@
             <p class="task-box-topic">Style, Cohesion & Culture</p>
             <div id="resTask3Score" class="task-box-score">0 / 12</div>
             <div id="resTask3Details" class="task-box-stats">
+              0 Correct • 0 Wrong
+            </div>
+          </div>
+
+          <div class="task-result-box">
+            <div class="task-box-header">
+              <span class="task-box-icon">💡</span>
+              <strong>TASK 4</strong>
+            </div>
+            <p class="task-box-topic">Synthesizing & Composing</p>
+            <div id="resTask4Score" class="task-box-score">0 / 10</div>
+            <div id="resTask4Details" class="task-box-stats">
               0 Correct • 0 Wrong
             </div>
           </div>

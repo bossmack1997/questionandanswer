@@ -1,238 +1,393 @@
-﻿<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover"
+    />
     <title>Teacher Dashboard — English Quest Analytics</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/teacher.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/teacher.css" />
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-</head>
-<body class="dashboard-body">
-
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  </head>
+  <body class="dashboard-body">
     <!-- Top Dashboard Navigation -->
     <header class="dashboard-navbar">
-        <div class="dash-nav-container">
-            <div class="dash-brand">
-                <span class="dash-logo-icon">🎓</span>
-                <div>
-                    <strong>ENGLISH QUEST</strong>
-                    <span class="dash-subtitle">Teacher Dashboard</span>
-                </div>
-            </div>
-            <div class="dash-user-controls">
-                <button type="button" id="viewAnswerKeyBtn" class="btn-tool" style="background: #e0e7ff; color: #3730a3; border-color: #c7d2fe;">
-                    🔑 View Official Answer Key
-                </button>
-                <span class="user-greeting">Welcome, <strong id="teacherUserEmail">Teacher</strong> 👩‍🏫</span>
-                <button type="button" id="teacherLogoutBtn" class="btn-logout">Sign Out</button>
-            </div>
+      <div class="dash-nav-container">
+        <div class="dash-brand">
+          <span class="dash-logo-icon">🎓</span>
+          <div>
+            <strong>ENGLISH QUEST</strong>
+            <span class="dash-subtitle">Teacher Dashboard</span>
+          </div>
         </div>
+        <div class="dash-user-controls">
+          <button
+            type="button"
+            id="viewAnswerKeyBtn"
+            class="btn-tool"
+            style="background: #e0e7ff; color: #3730a3; border-color: #c7d2fe"
+          >
+            🔑 View Official Answer Key
+          </button>
+          <span class="user-greeting"
+            >Welcome, <strong id="teacherUserEmail">Teacher</strong> 👩‍🏫</span
+          >
+          <button type="button" id="teacherLogoutBtn" class="btn-logout">
+            Sign Out
+          </button>
+        </div>
+      </div>
     </header>
 
     <main class="dashboard-content">
-        <div class="dash-main-container">
-            
-            <!-- KPI Summary Statistics -->
-            <section class="kpi-cards-grid">
-                <div class="kpi-card-box kpi-attempts">
-                    <div class="kpi-icon">👨‍🎓</div>
-                    <div class="kpi-details">
-                        <div id="kpiTotalAttempts" class="kpi-number">0</div>
-                        <div class="kpi-label">Total Attempts</div>
-                    </div>
-                </div>
+      <div class="dash-main-container">
+        <!-- KPI Summary Statistics -->
+        <section class="kpi-cards-grid">
+          <div class="kpi-card-box kpi-attempts">
+            <div class="kpi-icon">👨‍🎓</div>
+            <div class="kpi-details">
+              <div id="kpiTotalAttempts" class="kpi-number">0</div>
+              <div class="kpi-label">Total Attempts</div>
+            </div>
+          </div>
 
-                <div class="kpi-card-box kpi-average">
-                    <div class="kpi-icon">📊</div>
-                    <div class="kpi-details">
-                        <div id="kpiAvgScore" class="kpi-number">0%</div>
-                        <div class="kpi-label">Average Score</div>
-                    </div>
-                </div>
+          <div class="kpi-card-box kpi-average">
+            <div class="kpi-icon">📊</div>
+            <div class="kpi-details">
+              <div id="kpiAvgScore" class="kpi-number">0%</div>
+              <div class="kpi-label">Average Score</div>
+            </div>
+          </div>
 
-                <div class="kpi-card-box kpi-highest">
-                    <div class="kpi-icon">🏆</div>
-                    <div class="kpi-details">
-                        <div id="kpiHighestScore" class="kpi-number">0%</div>
-                        <div class="kpi-label">Highest Score</div>
-                    </div>
-                </div>
+          <div class="kpi-card-box kpi-highest">
+            <div class="kpi-icon">🏆</div>
+            <div class="kpi-details">
+              <div id="kpiHighestScore" class="kpi-number">0%</div>
+              <div class="kpi-label">Highest Score</div>
+            </div>
+          </div>
 
-                <div class="kpi-card-box kpi-proficient">
-                    <div class="kpi-icon">🎯</div>
-                    <div class="kpi-details">
-                        <div id="kpiProficiencyRate" class="kpi-number">0%</div>
-                        <div class="kpi-label">Pass Rate (≥75%)</div>
-                    </div>
-                </div>
-            </section>
+          <div class="kpi-card-box kpi-proficient">
+            <div class="kpi-icon">🎯</div>
+            <div class="kpi-details">
+              <div id="kpiProficiencyRate" class="kpi-number">0%</div>
+              <div class="kpi-label">Pass Rate (≥75%)</div>
+            </div>
+          </div>
+        </section>
 
-            <!-- Toolbar & Search -->
-            <section class="dash-toolbar">
-                <div class="search-input-wrap">
-                    <span class="search-ico">🔍</span>
-                    <input type="text" id="searchInput" class="search-field" placeholder="Search student name...">
-                </div>
+        <!-- Toolbar & Search -->
+        <section class="dash-toolbar">
+          <div class="search-input-wrap">
+            <span class="search-ico">🔍</span>
+            <input
+              type="text"
+              id="searchInput"
+              class="search-field"
+              placeholder="Search student name..."
+            />
+          </div>
 
-                <div class="toolbar-actions">
-                    <select id="scoreFilter" class="filter-dropdown">
-                        <option value="all">All Performance Levels</option>
-                        <option value="mastery">Mastery (90–100%)</option>
-                        <option value="proficient">Proficient (75–89%)</option>
-                        <option value="remediation">Needs Remediation (&lt;75%)</option>
-                    </select>
+          <div class="toolbar-actions">
+            <select id="scoreFilter" class="filter-dropdown">
+              <option value="all">All Performance Levels</option>
+              <option value="mastery">Mastery (90–100%)</option>
+              <option value="proficient">Proficient (75–89%)</option>
+              <option value="remediation">Needs Remediation (&lt;75%)</option>
+            </select>
 
-                    <button type="button" id="refreshDataBtn" class="btn-tool">
-                        <span>🔄 Refresh</span>
-                    </button>
+            <button type="button" id="refreshDataBtn" class="btn-tool">
+              <span>🔄 Refresh</span>
+            </button>
 
-                    <button type="button" id="exportCsvBtn" class="btn-tool btn-export-csv">
-                        <span>📥 Export CSV</span>
-                    </button>
-                </div>
-            </section>
+            <button
+              type="button"
+              id="exportCsvBtn"
+              class="btn-tool btn-export-csv"
+            >
+              <span>📥 Export CSV</span>
+            </button>
+          </div>
+        </section>
 
-            <!-- Results Table -->
-            <section class="dash-table-card">
-                <div class="table-meta-bar">
-                    <span id="resultCountBadge">Showing 0 submissions</span>
-                    <span id="tableLoading" class="hidden loading-indicator">⏳ Loading results...</span>
-                </div>
+        <!-- Results Table -->
+        <section class="dash-table-card">
+          <div class="table-meta-bar">
+            <span id="resultCountBadge">Showing 0 submissions</span>
+            <span id="tableLoading" class="hidden loading-indicator"
+              >⏳ Loading results...</span
+            >
+          </div>
 
-                <div class="table-wrapper">
-                    <table class="submissions-table">
-                        <thead>
-                            <tr>
-                                <th data-sort="studentName">Student Name ↕</th>
-                                <th data-sort="t1" class="text-center">Task 1 (/10) ↕</th>
-                                <th data-sort="t2" class="text-center">Task 2 (/10) ↕</th>
-                                <th data-sort="t3" class="text-center">Task 3 (/12) ↕</th>
-                                <th data-sort="totalScore" class="text-center">Total (/32) ↕</th>
-                                <th data-sort="percentage" class="text-center">Score % ↕</th>
-                                <th data-sort="completedAt">Date Completed ↕</th>
-                                <th class="text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultsTableBody">
-                            <!-- Injected by teacher-dashboard.js -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        </div>
+          <div class="table-wrapper">
+            <table class="submissions-table">
+              <thead>
+                <tr>
+                  <th data-sort="studentName">Student Name ↕</th>
+                  <th data-sort="t1" class="text-center">Task 1 (/10) ↕</th>
+                  <th data-sort="t2" class="text-center">Task 2 (/10) ↕</th>
+                  <th data-sort="t3" class="text-center">Task 3 (/12) ↕</th>
+                  <th data-sort="t4" class="text-center">Task 4 (/10) ↕</th>
+                  <th data-sort="totalScore" class="text-center">
+                    Total (/42) ↕
+                  </th>
+                  <th data-sort="percentage" class="text-center">Score % ↕</th>
+                  <th data-sort="completedAt">Date Completed ↕</th>
+                  <th class="text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="resultsTableBody">
+                <!-- Injected by teacher-dashboard.js -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </main>
 
     <!-- Student Detail Modal -->
     <div id="studentDetailModal" class="modal-backdrop hidden">
-        <div class="modal-card modal-detail-box">
-            <div class="detail-header">
-                <div>
-                    <span class="detail-tag">STUDENT RESULT</span>
-                    <h2 id="modalStudentName" class="detail-name">Juan Dela Cruz</h2>
-                </div>
-                <div class="detail-score-box">
-                    <span id="modalFinalScore" class="detail-score-val">24 / 32</span>
-                    <span id="modalPercentage" class="detail-pill">75%</span>
-                </div>
-            </div>
-
-            <hr class="detail-hr">
-
-            <div class="detail-tasks-list">
-                <div class="detail-task-card">
-                    <div class="dt-header">
-                        <strong>🎯 TASK 1 — Literary Elements</strong>
-                        <span id="modalT1Score" class="dt-score">8 / 10</span>
-                    </div>
-                    <div id="modalT1Breakdown" class="dt-sub">Correct: 8 | Wrong: 2 | Unanswered: 0</div>
-                </div>
-
-                <div class="detail-task-card">
-                    <div class="dt-header">
-                        <strong>🔎 TASK 2 — Analyzing & Evaluating</strong>
-                        <span id="modalT2Score" class="dt-score">7 / 10</span>
-                    </div>
-                    <div id="modalT2Breakdown" class="dt-sub">Correct: 7 | Wrong: 3 | Unanswered: 0</div>
-                </div>
-
-                <div class="detail-task-card">
-                    <div class="dt-header">
-                        <strong>✍️ TASK 3 — Style, Cohesion & Culture</strong>
-                        <span id="modalT3Score" class="dt-score">9 / 12</span>
-                    </div>
-                    <div id="modalT3Breakdown" class="dt-sub">Correct: 9 | Wrong: 3 | Unanswered: 0</div>
-                </div>
-            </div>
-
-            <div class="detail-meta-footer">
-                <div>⏱️ Time Used: <strong id="modalTimeUsed">18:42</strong></div>
-                <div>📅 Completed: <strong id="modalDate">September 4, 2026</strong></div>
-            </div>
-
-            <div id="modalAutoSubmitWarning" class="alert-box alert-danger hidden" style="margin-top: 1rem;">
-                ⚠️ Note: This quiz was automatically submitted due to multiple tab-switch alerts.
-            </div>
-
-            <div class="detail-btn-row">
-                <button type="button" id="closeModalBtn" class="btn-close-modal">Close</button>
-            </div>
+      <div class="modal-card modal-detail-box">
+        <div class="detail-header">
+          <div>
+            <span class="detail-tag">STUDENT RESULT</span>
+            <h2 id="modalStudentName" class="detail-name">Juan Dela Cruz</h2>
+          </div>
+          <div class="detail-score-box">
+            <span id="modalFinalScore" class="detail-score-val">24 / 42</span>
+            <span id="modalPercentage" class="detail-pill">75%</span>
+          </div>
         </div>
+
+        <hr class="detail-hr" />
+
+        <div class="detail-tasks-list">
+          <div class="detail-task-card">
+            <div class="dt-header">
+              <strong>🎯 TASK 1 — Literary Elements</strong>
+              <span id="modalT1Score" class="dt-score">8 / 10</span>
+            </div>
+            <div id="modalT1Breakdown" class="dt-sub">
+              Correct: 8 | Wrong: 2 | Unanswered: 0
+            </div>
+          </div>
+
+          <div class="detail-task-card">
+            <div class="dt-header">
+              <strong>🔎 TASK 2 — Analyzing & Evaluating</strong>
+              <span id="modalT2Score" class="dt-score">7 / 10</span>
+            </div>
+            <div id="modalT2Breakdown" class="dt-sub">
+              Correct: 7 | Wrong: 3 | Unanswered: 0
+            </div>
+          </div>
+
+          <div class="detail-task-card">
+            <div class="dt-header">
+              <strong>✍️ TASK 3 — Style, Cohesion & Culture</strong>
+              <span id="modalT3Score" class="dt-score">9 / 12</span>
+            </div>
+            <div id="modalT3Breakdown" class="dt-sub">
+              Correct: 9 | Wrong: 3 | Unanswered: 0
+            </div>
+          </div>
+
+          <div class="detail-task-card">
+            <div class="dt-header">
+              <strong>💡 TASK 4 — Synthesizing & Composing</strong>
+              <span id="modalT4Score" class="dt-score">8 / 10</span>
+            </div>
+            <div id="modalT4Breakdown" class="dt-sub">
+              Correct: 8 | Wrong: 2 | Unanswered: 0
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-meta-footer">
+          <div>⏱️ Time Used: <strong id="modalTimeUsed">18:42</strong></div>
+          <div>
+            📅 Completed: <strong id="modalDate">September 4, 2026</strong>
+          </div>
+        </div>
+
+        <div
+          id="modalAutoSubmitWarning"
+          class="alert-box alert-danger hidden"
+          style="margin-top: 1rem"
+        >
+          ⚠️ Note: This quiz was automatically submitted due to multiple
+          tab-switch alerts.
+        </div>
+
+        <div class="detail-btn-row">
+          <button type="button" id="closeModalBtn" class="btn-close-modal">
+            Close
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Official Teacher Answer Key Modal (Requirement 13) -->
     <div id="answerKeyModal" class="modal-backdrop hidden">
-        <div class="modal-card modal-detail-box" style="max-width: 650px;">
-            <div class="detail-header">
-                <div>
-                    <span class="detail-tag">CONFIDENTIAL TEACHER COPY</span>
-                    <h2 class="detail-name">🔑 Official Master Answer Key</h2>
-                </div>
-            </div>
-
-            <hr class="detail-hr">
-
-            <div style="text-align: left; max-height: 420px; overflow-y: auto; padding-right: 0.5rem;">
-                <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem;">
-                    <h3 style="color: #4f46e5; font-size: 1.05rem; margin-bottom: 0.5rem;">🎯 TASK 1 — Understanding Literary Elements (10 Questions)</h3>
-                    <p style="font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; line-height: 1.8;">
-                        1-C &nbsp;•&nbsp; 2-C &nbsp;•&nbsp; 3-B &nbsp;•&nbsp; 4-A &nbsp;•&nbsp; 5-B<br>
-                        6-A &nbsp;•&nbsp; 7-C &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-A &nbsp;•&nbsp; 10-B
-                    </p>
-                </div>
-
-                <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem;">
-                    <h3 style="color: #0284c7; font-size: 1.05rem; margin-bottom: 0.5rem;">🔎 TASK 2 — Analyzing and Evaluating a Literary Text (10 Questions)</h3>
-                    <p style="font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; line-height: 1.8;">
-                        1-B &nbsp;•&nbsp; 2-A &nbsp;•&nbsp; 3-A &nbsp;•&nbsp; 4-A &nbsp;•&nbsp; 5-B<br>
-                        6-B &nbsp;•&nbsp; 7-A &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-B &nbsp;•&nbsp; 10-A
-                    </p>
-                </div>
-
-                <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem;">
-                    <h3 style="color: #059669; font-size: 1.05rem; margin-bottom: 0.5rem;">✍️ TASK 3 — Language, Style, Cohesion, and Culture (12 Questions)</h3>
-                    <p style="font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; line-height: 1.8;">
-                        1-A &nbsp;•&nbsp; 2-B &nbsp;•&nbsp; 3-A &nbsp;•&nbsp; 4-A &nbsp;•&nbsp; 5-A &nbsp;•&nbsp; 6-B<br>
-                        7-A &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-A &nbsp;•&nbsp; 10-A &nbsp;•&nbsp; 11-B &nbsp;•&nbsp; 12-A
-                    </p>
-                </div>
-            </div>
-
-            <div class="detail-btn-row">
-                <button type="button" id="closeAnswerKeyBtn" class="btn-close-modal">Close Answer Key</button>
-            </div>
+      <div class="modal-card modal-detail-box" style="max-width: 650px">
+        <div class="detail-header">
+          <div>
+            <span class="detail-tag">CONFIDENTIAL TEACHER COPY</span>
+            <h2 class="detail-name">🔑 Official Master Answer Key</h2>
+          </div>
         </div>
+
+        <hr class="detail-hr" />
+
+        <div
+          style="
+            text-align: left;
+            max-height: 420px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+          "
+        >
+          <div
+            style="
+              background: #f8fafc;
+              border: 1.5px solid #e2e8f0;
+              border-radius: var(--radius-md);
+              padding: 1.25rem;
+              margin-bottom: 1rem;
+            "
+          >
+            <h3
+              style="color: #4f46e5; font-size: 1.05rem; margin-bottom: 0.5rem"
+            >
+              🎯 TASK 1 — Understanding Literary Elements (10 Questions)
+            </h3>
+            <p
+              style="
+                font-family: var(--font-mono);
+                font-size: 0.95rem;
+                font-weight: 700;
+                line-height: 1.8;
+              "
+            >
+              1-C &nbsp;•&nbsp; 2-C &nbsp;•&nbsp; 3-B &nbsp;•&nbsp; 4-A
+              &nbsp;•&nbsp; 5-B<br />
+              6-A &nbsp;•&nbsp; 7-C &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-A
+              &nbsp;•&nbsp; 10-B
+            </p>
+          </div>
+
+          <div
+            style="
+              background: #f8fafc;
+              border: 1.5px solid #e2e8f0;
+              border-radius: var(--radius-md);
+              padding: 1.25rem;
+              margin-bottom: 1rem;
+            "
+          >
+            <h3
+              style="color: #0284c7; font-size: 1.05rem; margin-bottom: 0.5rem"
+            >
+              🔎 TASK 2 — Analyzing and Evaluating a Literary Text (10
+              Questions)
+            </h3>
+            <p
+              style="
+                font-family: var(--font-mono);
+                font-size: 0.95rem;
+                font-weight: 700;
+                line-height: 1.8;
+              "
+            >
+              1-B &nbsp;•&nbsp; 2-A &nbsp;•&nbsp; 3-A &nbsp;•&nbsp; 4-A
+              &nbsp;•&nbsp; 5-B<br />
+              6-B &nbsp;•&nbsp; 7-A &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-B
+              &nbsp;•&nbsp; 10-A
+            </p>
+          </div>
+
+          <div
+            style="
+              background: #f8fafc;
+              border: 1.5px solid #e2e8f0;
+              border-radius: var(--radius-md);
+              padding: 1.25rem;
+              margin-bottom: 1rem;
+            "
+          >
+            <h3
+              style="color: #059669; font-size: 1.05rem; margin-bottom: 0.5rem"
+            >
+              ✍️ TASK 3 — Language, Style, Cohesion, and Culture (12 Questions)
+            </h3>
+            <p
+              style="
+                font-family: var(--font-mono);
+                font-size: 0.95rem;
+                font-weight: 700;
+                line-height: 1.8;
+              "
+            >
+              1-A &nbsp;•&nbsp; 2-B &nbsp;•&nbsp; 3-A &nbsp;•&nbsp; 4-A
+              &nbsp;•&nbsp; 5-A &nbsp;•&nbsp; 6-B<br />
+              7-A &nbsp;•&nbsp; 8-A &nbsp;•&nbsp; 9-A &nbsp;•&nbsp; 10-A
+              &nbsp;•&nbsp; 11-B &nbsp;•&nbsp; 12-A
+            </p>
+          </div>
+
+          <div
+            style="
+              background: #f8fafc;
+              border: 1.5px solid #e2e8f0;
+              border-radius: var(--radius-md);
+              padding: 1.25rem;
+              margin-bottom: 1rem;
+            "
+          >
+            <h3
+              style="color: #d97706; font-size: 1.05rem; margin-bottom: 0.5rem"
+            >
+              💡 TASK 4 — Synthesizing, Composing, and Expressing Insights (10
+              Questions)
+            </h3>
+            <p
+              style="
+                font-family: var(--font-mono);
+                font-size: 0.95rem;
+                font-weight: 700;
+                line-height: 1.8;
+              "
+            >
+              1-B &nbsp;•&nbsp; 2-B &nbsp;•&nbsp; 3-C &nbsp;•&nbsp; 4-B
+              &nbsp;•&nbsp; 5-B<br />
+              6-A &nbsp;•&nbsp; 7-B &nbsp;•&nbsp; 8-C &nbsp;•&nbsp; 9-B
+              &nbsp;•&nbsp; 10-A
+            </p>
+          </div>
+        </div>
+
+        <div class="detail-btn-row">
+          <button type="button" id="closeAnswerKeyBtn" class="btn-close-modal">
+            Close Answer Key
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Scripts -->
     <script src="js/questions.js"></script>
     <script src="js/firebase.js"></script>
     <script src="js/teacher-dashboard.js"></script>
-</body>
+  </body>
 </html>
