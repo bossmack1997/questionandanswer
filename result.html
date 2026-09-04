@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover"
+    />
+    <title>Quest Complete — English Quest</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&family=JetBrains+Mono:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/quiz.css" />
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  </head>
+  <body class="result-body">
+    <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
+
+    <div class="result-wrapper">
+      <main class="result-container-card" role="main">
+        <!-- Trophy & Congratulations -->
+        <div class="result-trophy-badge" aria-hidden="true">🏆</div>
+        <h1 class="result-heading">QUEST COMPLETE!</h1>
+        <p class="result-cheer">
+          Outstanding effort,
+          <span id="resStudentName" class="student-name-bold">Learner</span>! 🎉
+        </p>
+
+        <!-- Final Score Hero Section -->
+        <section class="final-score-banner" aria-label="Score Overview">
+          <div class="score-banner-item">
+            <span class="score-banner-label">FINAL SCORE</span>
+            <span id="resFinalScore" class="score-banner-value">0 / 32</span>
+          </div>
+          <div class="score-banner-divider"></div>
+          <div class="score-banner-item">
+            <span class="score-banner-label">ACCURACY</span>
+            <span id="resPercentage" class="score-banner-value">0%</span>
+          </div>
+          <div class="score-banner-divider"></div>
+          <div class="score-banner-item">
+            <span class="score-banner-label">TOTAL XP</span>
+            <span id="resEarnedXP" class="score-banner-value">0 XP</span>
+          </div>
+          <div class="score-banner-divider"></div>
+          <div class="score-banner-item">
+            <span class="score-banner-label">BEST STREAK</span>
+            <span id="resBestStreak" class="score-banner-value">x0</span>
+          </div>
+        </section>
+
+        <!-- Performance Evaluation Message & Achievement Badge -->
+        <section class="evaluation-container" aria-label="Achievement Badge">
+          <div id="resBadge" class="perf-badge badge-explorer">
+            ENGLISH EXPLORER
+          </div>
+          <p id="resEvaluationText" class="evaluation-text">
+            Well done! You demonstrated solid understanding of Grade 10 English
+            competencies.
+          </p>
+        </section>
+
+        <hr class="result-separator" />
+
+        <!-- Task Breakdown Cards (Tasks 1, 2, 3) -->
+        <h3 class="breakdown-title">📊 TASK PERFORMANCE BREAKDOWN</h3>
+        <section class="task-results-grid" aria-label="Task Breakdown">
+          <div class="task-result-box">
+            <div class="task-box-header">
+              <span class="task-box-icon">🎯</span>
+              <strong>TASK 1</strong>
+            </div>
+            <p class="task-box-topic">Literary Elements</p>
+            <div id="resTask1Score" class="task-box-score">0 / 10</div>
+            <div id="resTask1Details" class="task-box-stats">
+              0 Correct • 0 Wrong
+            </div>
+          </div>
+
+          <div class="task-result-box">
+            <div class="task-box-header">
+              <span class="task-box-icon">🔎</span>
+              <strong>TASK 2</strong>
+            </div>
+            <p class="task-box-topic">Evaluating Literary Text</p>
+            <div id="resTask2Score" class="task-box-score">0 / 10</div>
+            <div id="resTask2Details" class="task-box-stats">
+              0 Correct • 0 Wrong
+            </div>
+          </div>
+
+          <div class="task-result-box">
+            <div class="task-box-header">
+              <span class="task-box-icon">✍️</span>
+              <strong>TASK 3</strong>
+            </div>
+            <p class="task-box-topic">Style, Cohesion & Culture</p>
+            <div id="resTask3Score" class="task-box-score">0 / 12</div>
+            <div id="resTask3Details" class="task-box-stats">
+              0 Correct • 0 Wrong
+            </div>
+          </div>
+        </section>
+
+        <!-- Quick Stats Bar -->
+        <div class="quick-stats-bar">
+          <div class="stat-item">
+            <span class="stat-icon">✅</span>
+            <span>Correct: <strong id="resTotalCorrect">0</strong></span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-icon">❌</span>
+            <span>Wrong: <strong id="resTotalWrong">0</strong></span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-icon">⚠️</span>
+            <span>Unanswered: <strong id="resTotalUnanswered">0</strong></span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-icon">⏱️</span>
+            <span>Time Spent: <strong id="resTimeUsed">00:00</strong></span>
+          </div>
+        </div>
+
+        <div
+          id="autoSubmitNotice"
+          class="auto-submit-alert hidden"
+          role="alert"
+        >
+          ⚠️ Assessment submitted automatically by anti-cheating monitor.
+        </div>
+
+        <p class="completion-timestamp">
+          Completed on: <span id="resCompletedAt">--</span>
+        </p>
+
+        <!-- Result Actions -->
+        <footer class="result-actions">
+          <button
+            type="button"
+            id="reviewAnswersBtn"
+            class="btn-secondary-action"
+          >
+            <span>🔍 Review Answers</span>
+          </button>
+          <button
+            type="button"
+            id="printReportBtn"
+            class="btn-secondary-action"
+          >
+            <span>🖨️ Print Certificate</span>
+          </button>
+          <a
+            href="index.html"
+            class="btn-launch btn-compact"
+            id="homePortalBtn"
+          >
+            <span>Home Portal</span>
+            <span>🏠</span>
+          </a>
+        </footer>
+      </main>
+    </div>
+
+    <!-- STUDENT ANSWER REVIEW MODAL -->
+    <div
+      id="answerReviewModal"
+      class="modal-backdrop hidden"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-card review-modal-card">
+        <div class="modal-header-row">
+          <h3 class="modal-title">📝 QUEST ANSWERS REVIEW</h3>
+          <button
+            type="button"
+            id="closeReviewModalBtn"
+            class="btn-close-modal"
+            aria-label="Close Review"
+          >
+            ✖
+          </button>
+        </div>
+        <p class="reading-subtext" style="margin-bottom: 0.5rem">
+          Review your answers and verified solutions below:
+        </p>
+
+        <div id="reviewItemsList" class="review-items-container">
+          <!-- Dynamically populated review questions -->
+        </div>
+
+        <button
+          type="button"
+          id="dismissReviewBtn"
+          class="btn-secondary-action"
+          style="align-self: flex-end"
+        >
+          <span>Close Review</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/questions.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/firebase.js"></script>
+    <script src="js/result.js"></script>
+  </body>
+</html>

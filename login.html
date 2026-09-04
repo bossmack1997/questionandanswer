@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <title>Student Login — English Quest</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/student.css">
+    <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body class="student-page-body">
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+
+    <div class="student-wrapper">
+        <header class="top-bar">
+            <a href="index.html" class="back-link">← Back to Portal</a>
+            <div class="brand-mini">🎮 ENGLISH QUEST</div>
+        </header>
+
+        <main id="nameEntryCard" class="entry-card">
+            <div class="avatar-header">
+                <div class="animated-avatar">🧒</div>
+                <span class="badge-role">STUDENT LOGIN</span>
+            </div>
+
+            <h1 class="entry-title">👋 WELCOME, LEARNER!</h1>
+            <p class="entry-subtitle">Enter your name to begin or resume your English Quest:</p>
+
+            <form id="studentNameForm" class="name-form" novalidate onsubmit="handleLoginSubmit(event)">
+                <div class="input-group">
+                    <span class="input-icon">✏️</span>
+                    <input type="text" id="studentNameInput" class="name-input" placeholder="Enter your full name..." maxlength="50" required autofocus autocomplete="name" aria-label="Student Full Name">
+                </div>
+                <p id="nameError" class="input-error hidden" role="alert">Please enter your name (at least 2 characters).</p>
+
+                <button type="submit" id="nameSubmitBtn" class="btn-launch">
+                    <span>START QUEST</span>
+                    <span>🚀</span>
+                </button>
+            </form>
+        </main>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script>
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('studentNameInput');
+            const err = document.getElementById('nameError');
+            const val = input.value.trim();
+            if (!val || val.length < 2) {
+                err.classList.remove('hidden');
+                return;
+            }
+            err.classList.add('hidden');
+            AuthManager.loginStudent(val);
+            sessionStorage.setItem('current_student_name', val);
+            localStorage.setItem('student_name', val);
+            window.location.href = 'student.html';
+        }
+    </script>
+</body>
+</html>
+
