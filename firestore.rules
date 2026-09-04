@@ -36,6 +36,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // 5. Active Student Sessions
+    match /active_students/{studentId} {
+      allow read, write, delete: if true;
+    }
+
     // Default deny for unmatched collections
     match /{document=**} {
       allow read, write: if false;

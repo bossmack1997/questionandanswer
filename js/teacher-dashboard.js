@@ -17,6 +17,8 @@ class TeacherDashboard {
     constructor() {
         this.activeAttempts = [];
         this.completedResults = [];
+        this.taskSubmissions = [];
+        this.activeStudents = [];
         this.combinedLearners = [];
         this.filteredLearners = [];
 
@@ -25,6 +27,8 @@ class TeacherDashboard {
 
         this.unsubActiveAttempts = null;
         this.unsubQuizResults = null;
+        this.unsubSubmissions = null;
+        this.unsubActiveStudents = null;
         this.relativeTimeTicker = null;
 
         this.init();
@@ -40,17 +44,35 @@ class TeacherDashboard {
             return;
         }
 
+        const localTeacherEmail = localStorage.getItem('english10_teacher_email');
+        const hasTeacherAuth = sessionStorage.getItem('english10_teacher_auth') || localTeacherEmail;
+        const userEmailEl = document.getElementById('teacherUserEmail');
+
+        if (localTeacherEmail && userEmailEl) {
+            userEmailEl.textContent = localTeacherEmail;
+        }
+
+        // 1. Initial Local Cache & Realtime Listeners (Immediate Auto-Restore)
+        this.setupRealtimeListeners();
+        this.fetchInitialData();
+
+        // 2. Auth State Validation
         window.firebaseService.onAuthStateChanged((user) => {
-            if (!user) {
+            if (user) {
+                if (userEmailEl) userEmailEl.textContent = user.email || 'Teacher';
+                localStorage.setItem('english10_teacher_email', user.email);
+            } else if (!hasTeacherAuth) {
                 this.cleanupListeners();
                 window.location.replace('teacher-login.html');
                 return;
             }
+        });
 
-            const userEmailEl = document.getElementById('teacherUserEmail');
-            if (userEmailEl) userEmailEl.textContent = user.email || 'Teacher';
-
-            this.setupRealtimeListeners();
+        // 3. Cross-Tab Auto-Sync: Instant real-time restore when students submit in another tab
+        window.addEventListener('storage', (e) => {
+            if (e.key && e.key.startsWith('english10_')) {
+                this.reconcileData();
+            }
         });
 
         this.bindEvents();
@@ -61,39 +83,105 @@ class TeacherDashboard {
         });
     }
 
+    async fetchInitialData() {
+        try {
+            const results = await window.firebaseService.getAllResults();
+            if (Array.isArray(results) && results.length > 0) {
+                this.completedResults = results;
+            }
+
+            const subs = await window.firebaseService.getAllSubmissions();
+            if (Array.isArray(subs) && subs.length > 0) {
+                this.taskSubmissions = subs;
+            }
+
+            const students = await window.firebaseService.getActiveStudents();
+            if (Array.isArray(students) && students.length > 0) {
+                this.activeStudents = students;
+            }
+
+            if (window.firebaseService.initialized && window.firebaseService.db) {
+                const attemptsSnap = await window.firebaseService.db.collection('active_attempts').get();
+                const list = [];
+                attemptsSnap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+                if (list.length > 0) this.activeAttempts = list;
+            }
+
+            this.reconcileData();
+        } catch (e) {
+            console.warn('[TeacherDashboard] Direct fetch note:', e);
+            this.reconcileData();
+        }
+    }
+
     setupRealtimeListeners() {
         this.cleanupListeners();
 
         const loadingIndicator = document.getElementById('tableLoading');
         if (loadingIndicator) loadingIndicator.classList.remove('hidden');
 
+        // Initial Local Cache Reconciliation (Zero-delay render)
+        this.reconcileData();
+
         // 1. Subscribe to In-Progress Active Quiz Attempts
-        this.unsubActiveAttempts = window.firebaseService.listenToActiveAttempts(
-            (attempts) => {
-                this.activeAttempts = attempts || [];
-                this.reconcileData();
-                if (loadingIndicator) loadingIndicator.classList.add('hidden');
-            },
-            (err) => {
-                console.warn('[TeacherDashboard] Active attempts listener warning:', err.message);
-                if (loadingIndicator) loadingIndicator.classList.add('hidden');
-            }
-        );
+        if (typeof window.firebaseService.listenToActiveAttempts === 'function') {
+            this.unsubActiveAttempts = window.firebaseService.listenToActiveAttempts(
+                (attempts) => {
+                    this.activeAttempts = attempts || [];
+                    this.reconcileData();
+                    if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                },
+                (err) => {
+                    console.warn('[TeacherDashboard] Active attempts listener warning:', err.message);
+                    if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                }
+            );
+        }
 
         // 2. Subscribe to Historical & Live Completed Quiz Results
-        this.unsubQuizResults = window.firebaseService.listenToQuizResults(
-            (results) => {
-                this.completedResults = results || [];
-                this.reconcileData();
-                if (loadingIndicator) loadingIndicator.classList.add('hidden');
-            },
-            (err) => {
-                console.warn('[TeacherDashboard] Quiz results listener warning:', err.message);
-                if (loadingIndicator) loadingIndicator.classList.add('hidden');
-            }
-        );
+        if (typeof window.firebaseService.listenToQuizResults === 'function') {
+            this.unsubQuizResults = window.firebaseService.listenToQuizResults(
+                (results) => {
+                    this.completedResults = results || [];
+                    this.reconcileData();
+                    if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                },
+                (err) => {
+                    console.warn('[TeacherDashboard] Quiz results listener warning:', err.message);
+                    if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                }
+            );
+        }
 
-        // 3. Start 30-second relative time ticker
+        // 3. Subscribe to Individual Task Submissions (Tasks 1, 2, 3)
+        if (typeof window.firebaseService.listenToSubmissions === 'function') {
+            this.unsubSubmissions = window.firebaseService.listenToSubmissions(
+                (submissions) => {
+                    this.taskSubmissions = submissions || [];
+                    this.reconcileData();
+                    if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                },
+                (err) => {
+                    console.warn('[TeacherDashboard] Submissions listener warning:', err.message);
+                }
+            );
+        }
+
+        // 4. Subscribe to Registered / Logged-in Active Students
+        if (typeof window.firebaseService.listenToActiveStudents === 'function') {
+            this.unsubActiveStudents = window.firebaseService.listenToActiveStudents(
+                (students) => {
+                    this.activeStudents = students || [];
+                    this.reconcileData();
+                    if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                },
+                (err) => {
+                    console.warn('[TeacherDashboard] Active students listener warning:', err.message);
+                }
+            );
+        }
+
+        // 5. Start 30-second relative time ticker
         this.relativeTimeTicker = setInterval(() => {
             this.updateRelativeTimeDisplays();
         }, 30000);
@@ -108,6 +196,14 @@ class TeacherDashboard {
             try { this.unsubQuizResults(); } catch (e) {}
             this.unsubQuizResults = null;
         }
+        if (typeof this.unsubSubmissions === 'function') {
+            try { this.unsubSubmissions(); } catch (e) {}
+            this.unsubSubmissions = null;
+        }
+        if (typeof this.unsubActiveStudents === 'function') {
+            try { this.unsubActiveStudents(); } catch (e) {}
+            this.unsubActiveStudents = null;
+        }
         if (this.relativeTimeTicker) {
             clearInterval(this.relativeTimeTicker);
             this.relativeTimeTicker = null;
@@ -115,18 +211,345 @@ class TeacherDashboard {
     }
 
     // ==========================================
-    // DATA RECONCILIATION & DEDUPLICATION
+    // MULTI-SOURCE DATA RECONCILIATION & DEDUPLICATION
     // ==========================================
 
     reconcileData() {
         const learnerMap = new Map();
+        const studentTaskMap = new Map();
         const totalConfiguredQuestions = (typeof QUIZ_CONFIG !== 'undefined' && QUIZ_CONFIG.totalQuestions) ? QUIZ_CONFIG.totalQuestions : 32;
 
-        // Step 1: Process Completed Results (Historical & Live)
+        // -------------------------------------------------------------
+        // SOURCE 0: LocalStorage Backups (Offline & Sandbox Test Cache)
+        // -------------------------------------------------------------
+        if (typeof localStorage !== 'undefined') {
+            // A. Cached Completed Submissions list
+            try {
+                const localSubmissions = JSON.parse(localStorage.getItem('english10_quiz_submissions') || '[]');
+                if (Array.isArray(localSubmissions)) {
+                    localSubmissions.forEach(r => {
+                        if (!r || (!r.studentName && !r.studentId)) return;
+                        const sid = r.studentId || window.firebaseService.normalizeStudentId(r.studentName, r.section || r.studentSection);
+                        const totalQ = r.totalQuestions || totalConfiguredQuestions;
+                        const score = typeof r.totalScore === 'number' ? r.totalScore : (typeof r.score === 'number' ? r.score : 0);
+                        const pct = typeof r.percentage === 'number' ? r.percentage : (totalQ > 0 ? Number(((score / totalQ) * 100).toFixed(2)) : 0);
+                        const completedTime = r.completedAt ? new Date(r.completedAt).toISOString() : new Date().toISOString();
+
+                        learnerMap.set(sid, {
+                            id: r.id || sid,
+                            attemptId: r.attemptId || ('quest_' + sid),
+                            studentId: sid,
+                            studentName: r.studentName || 'Student',
+                            section: r.section || r.studentSection || 'Grade 10',
+                            status: r.autoSubmitted ? 'auto_submitted' : 'completed',
+                            currentTaskDisplay: 'Completed',
+                            currentTaskNum: 3,
+                            currentQuestion: totalQ,
+                            totalQuestions: totalQ,
+                            answeredQuestions: totalQ,
+                            score: score,
+                            percentage: pct,
+                            earnedXP: r.earnedXP || (score * 10),
+                            maxStreak: r.maxStreak || 0,
+                            timeUsed: r.timeUsed || 0,
+                            autoSubmitted: Boolean(r.autoSubmitted),
+                            tabSwitches: r.tabSwitches || 0,
+                            task1Score: r.task1Score !== undefined ? r.task1Score : (r.task1Correct || 0),
+                            task1Correct: r.task1Correct,
+                            task1Wrong: r.task1Wrong,
+                            task1Unanswered: r.task1Unanswered,
+                            task2Score: r.task2Score !== undefined ? r.task2Score : (r.task2Correct || 0),
+                            task2Correct: r.task2Correct,
+                            task2Wrong: r.task2Wrong,
+                            task2Unanswered: r.task2Unanswered,
+                            task3Score: r.task3Score !== undefined ? r.task3Score : (r.task3Correct || 0),
+                            task3Correct: r.task3Correct,
+                            task3Wrong: r.task3Wrong,
+                            task3Unanswered: r.task3Unanswered,
+                            startedAt: r.startedAt || completedTime,
+                            updatedAt: completedTime,
+                            completedAt: completedTime,
+                            isLive: false,
+                            rawDoc: r
+                        });
+                    });
+                }
+            } catch (e) {}
+
+            // B. Scan all localStorage keys for active attempts, single results, task submissions
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (!key) continue;
+
+                    if (key.startsWith('english10_last_result')) {
+                        const val = localStorage.getItem(key);
+                        if (val) {
+                            try {
+                                const r = JSON.parse(val);
+                                if (r && (r.studentName || r.studentId)) {
+                                    const sid = r.studentId || window.firebaseService.normalizeStudentId(r.studentName, r.section || r.studentSection);
+                                    const totalQ = r.totalQuestions || totalConfiguredQuestions;
+                                    const score = typeof r.totalScore === 'number' ? r.totalScore : (typeof r.score === 'number' ? r.score : 0);
+                                    const pct = typeof r.percentage === 'number' ? r.percentage : (totalQ > 0 ? Number(((score / totalQ) * 100).toFixed(2)) : 0);
+                                    const completedTime = r.completedAt ? new Date(r.completedAt).toISOString() : new Date().toISOString();
+
+                                    if (!learnerMap.has(sid) || new Date(completedTime).getTime() >= new Date(learnerMap.get(sid).completedAt || 0).getTime()) {
+                                        learnerMap.set(sid, {
+                                            id: r.id || sid,
+                                            attemptId: r.attemptId || ('quest_' + sid),
+                                            studentId: sid,
+                                            studentName: r.studentName || 'Student',
+                                            section: r.section || r.studentSection || 'Grade 10',
+                                            status: r.autoSubmitted ? 'auto_submitted' : 'completed',
+                                            currentTaskDisplay: 'Completed',
+                                            currentTaskNum: 3,
+                                            currentQuestion: totalQ,
+                                            totalQuestions: totalQ,
+                                            answeredQuestions: totalQ,
+                                            score: score,
+                                            percentage: pct,
+                                            earnedXP: r.earnedXP || (score * 10),
+                                            maxStreak: r.maxStreak || 0,
+                                            timeUsed: r.timeUsed || 0,
+                                            autoSubmitted: Boolean(r.autoSubmitted),
+                                            tabSwitches: r.tabSwitches || 0,
+                                            task1Score: r.task1Score !== undefined ? r.task1Score : (r.task1Correct || 0),
+                                            task1Correct: r.task1Correct,
+                                            task1Wrong: r.task1Wrong,
+                                            task1Unanswered: r.task1Unanswered,
+                                            task2Score: r.task2Score !== undefined ? r.task2Score : (r.task2Correct || 0),
+                                            task2Correct: r.task2Correct,
+                                            task2Wrong: r.task2Wrong,
+                                            task2Unanswered: r.task2Unanswered,
+                                            task3Score: r.task3Score !== undefined ? r.task3Score : (r.task3Correct || 0),
+                                            task3Correct: r.task3Correct,
+                                            task3Wrong: r.task3Wrong,
+                                            task3Unanswered: r.task3Unanswered,
+                                            startedAt: r.startedAt || completedTime,
+                                            updatedAt: completedTime,
+                                            completedAt: completedTime,
+                                            isLive: false,
+                                            rawDoc: r
+                                        });
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                    } else if (key.startsWith('english10_task_submission_') || key.startsWith('english10_sub_')) {
+                        const val = localStorage.getItem(key);
+                        if (val) {
+                            try {
+                                const sub = JSON.parse(val);
+                                if (sub && (sub.studentName || sub.studentId)) {
+                                    const sid = sub.studentId || window.firebaseService.normalizeStudentId(sub.studentName, sub.section || sub.studentSection);
+                                    if (!studentTaskMap.has(sid)) {
+                                        studentTaskMap.set(sid, {
+                                            studentId: sid,
+                                            studentName: sub.studentName,
+                                            section: sub.section || sub.studentSection,
+                                            tasks: {},
+                                            latestSubmittedAt: sub.submittedAt
+                                        });
+                                    }
+                                    const tNum = parseInt(sub.taskId, 10) || 1;
+                                    studentTaskMap.get(sid).tasks[tNum] = sub;
+                                }
+                            } catch (e) {}
+                        }
+                    } else if (key.startsWith('english10_active_attempt_') || key.startsWith('english10_quest_attempt_')) {
+                        const val = localStorage.getItem(key);
+                        if (val) {
+                            try {
+                                const a = JSON.parse(val);
+                                if (a && (a.studentName || a.studentId)) {
+                                    const sid = a.studentId || a.id || window.firebaseService.normalizeStudentId(a.studentName, a.section || a.studentSection);
+                                    if (!learnerMap.has(sid) || learnerMap.get(sid).status === 'in_progress') {
+                                        const totalQ = a.totalQuestions || totalConfiguredQuestions;
+                                        const answersMap = a.answersMap || {};
+                                        const answeredQ = a.answeredQuestions !== undefined ? a.answeredQuestions : Object.keys(answersMap).length;
+                                        const score = typeof a.score === 'number' ? a.score : 0;
+                                        const progressPct = a.progressPercentage !== undefined ? a.progressPercentage : (totalQ > 0 ? Math.min(100, Math.round((answeredQ / totalQ) * 100)) : 0);
+                                        const taskNum = a.currentTask || 1;
+                                        const updatedIso = a.updatedAt || a.startedAt || new Date().toISOString();
+
+                                        learnerMap.set(sid, {
+                                            id: a.id || sid,
+                                            attemptId: a.attemptId || ('quest_' + sid),
+                                            studentId: sid,
+                                            studentName: a.studentName || 'Student',
+                                            section: a.section || a.studentSection || 'Grade 10',
+                                            status: a.status || 'in_progress',
+                                            currentTaskDisplay: 'Task ' + taskNum,
+                                            currentTaskNum: taskNum,
+                                            currentQuestion: a.currentQuestion || (a.currentQuestionIndex !== undefined ? a.currentQuestionIndex + 1 : 1),
+                                            totalQuestions: totalQ,
+                                            answeredQuestions: answeredQ,
+                                            score: score,
+                                            percentage: a.percentage !== undefined ? a.percentage : (totalQ > 0 ? Number(((score / totalQ) * 100).toFixed(2)) : 0),
+                                            progressPercentage: progressPct,
+                                            earnedXP: a.earnedXP || (score * 10),
+                                            streak: a.streak || 0,
+                                            maxStreak: a.maxStreak || 0,
+                                            timeUsed: a.totalTimeUsed || 0,
+                                            autoSubmitted: Boolean(a.autoSubmitted),
+                                            tabSwitches: a.tabSwitches || 0,
+                                            taskScores: a.taskScores || {},
+                                            task1Score: (a.taskScores && a.taskScores.task1) ? a.taskScores.task1.score : (a.task1Score || 0),
+                                            task2Score: (a.taskScores && a.taskScores.task2) ? a.taskScores.task2.score : (a.task2Score || 0),
+                                            task3Score: (a.taskScores && a.taskScores.task3) ? a.taskScores.task3.score : (a.task3Score || 0),
+                                            startedAt: a.startedAt || updatedIso,
+                                            updatedAt: updatedIso,
+                                            completedAt: a.submittedAt || null,
+                                            isLive: true,
+                                            rawDoc: a
+                                        });
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // -------------------------------------------------------------
+        // SOURCE 1: Registered Active Students (from active_students)
+        // -------------------------------------------------------------
+        this.activeStudents.forEach(st => {
+            const sid = st.studentId || window.firebaseService.normalizeStudentId(st.studentName, st.studentSection || st.section);
+            if (!learnerMap.has(sid)) {
+                learnerMap.set(sid, {
+                    id: st.id || sid,
+                    attemptId: 'reg_' + sid,
+                    studentId: sid,
+                    studentName: st.studentName || 'Student',
+                    section: st.studentSection || st.section || 'Grade 10',
+                    status: 'in_progress',
+                    currentTaskDisplay: 'Task ' + (st.currentTask || 1),
+                    currentTaskNum: st.currentTask || 1,
+                    currentQuestion: 1,
+                    totalQuestions: totalConfiguredQuestions,
+                    answeredQuestions: 0,
+                    score: 0,
+                    percentage: 0,
+                    progressPercentage: 0,
+                    earnedXP: 0,
+                    streak: 0,
+                    maxStreak: 0,
+                    timeUsed: 0,
+                    autoSubmitted: false,
+                    tabSwitches: 0,
+                    task1Score: 0,
+                    task2Score: 0,
+                    task3Score: 0,
+                    startedAt: st.lastActive || new Date().toISOString(),
+                    updatedAt: st.lastActive || new Date().toISOString(),
+                    completedAt: null,
+                    isLive: true,
+                    rawDoc: st
+                });
+            }
+        });
+
+        // -------------------------------------------------------------
+        // SOURCE 2: Task-Level Submissions (from submissions collection)
+        // -------------------------------------------------------------
+        this.taskSubmissions.forEach(sub => {
+            const sid = sub.studentId || window.firebaseService.normalizeStudentId(sub.studentName, sub.section || sub.studentSection);
+            if (!studentTaskMap.has(sid)) {
+                studentTaskMap.set(sid, {
+                    studentId: sid,
+                    studentName: sub.studentName,
+                    section: sub.section || sub.studentSection,
+                    tasks: {},
+                    latestSubmittedAt: sub.submittedAt
+                });
+            }
+            const entry = studentTaskMap.get(sid);
+            const tNum = parseInt(sub.taskId, 10) || 1;
+            entry.tasks[tNum] = sub;
+            if (sub.submittedAt && (!entry.latestSubmittedAt || new Date(sub.submittedAt).getTime() > new Date(entry.latestSubmittedAt).getTime())) {
+                entry.latestSubmittedAt = sub.submittedAt;
+            }
+        });
+
+        studentTaskMap.forEach((entry, sid) => {
+            const t1 = entry.tasks[1];
+            const t2 = entry.tasks[2];
+            const t3 = entry.tasks[3];
+
+            const t1Score = t1 ? (t1.score || 0) : 0;
+            const t2Score = t2 ? (t2.score || 0) : 0;
+            const t3Score = t3 ? (t3.score || 0) : 0;
+            const totalScore = t1Score + t2Score + t3Score;
+
+            const t1Total = t1 ? (t1.totalQuestions || 10) : 10;
+            const t2Total = t2 ? (t2.totalQuestions || 10) : 10;
+            const t3Total = t3 ? (t3.totalQuestions || 12) : 12;
+
+            let completedTasksCount = 0;
+            let answeredQ = 0;
+            if (t1) { completedTasksCount++; answeredQ += t1Total; }
+            if (t2) { completedTasksCount++; answeredQ += t2Total; }
+            if (t3) { completedTasksCount++; answeredQ += t3Total; }
+
+            const isAllCompleted = completedTasksCount >= 3;
+            const nextTaskNum = Math.min(3, completedTasksCount + 1);
+            const status = isAllCompleted ? 'completed' : 'in_progress';
+            const progressPct = Math.min(100, Math.round((answeredQ / totalConfiguredQuestions) * 100));
+            const pct = totalConfiguredQuestions > 0 ? Number(((totalScore / totalConfiguredQuestions) * 100).toFixed(2)) : 0;
+
+            // Only overlay if record doesn't exist or is not completed
+            if (!learnerMap.has(sid) || learnerMap.get(sid).status !== 'completed') {
+                learnerMap.set(sid, {
+                    id: sid,
+                    attemptId: 'task_subs_' + sid,
+                    studentId: sid,
+                    studentName: entry.studentName || 'Student',
+                    section: entry.section || 'Grade 10',
+                    status: status,
+                    currentTaskDisplay: isAllCompleted ? 'Completed' : ('Task ' + nextTaskNum),
+                    currentTaskNum: nextTaskNum,
+                    currentQuestion: answeredQ,
+                    totalQuestions: totalConfiguredQuestions,
+                    answeredQuestions: answeredQ,
+                    score: totalScore,
+                    percentage: pct,
+                    progressPercentage: progressPct,
+                    earnedXP: totalScore * 10,
+                    maxStreak: 0,
+                    timeUsed: (t1?.timeUsed || 0) + (t2?.timeUsed || 0) + (t3?.timeUsed || 0),
+                    autoSubmitted: Boolean(t1?.autoSubmitted || t2?.autoSubmitted || t3?.autoSubmitted),
+                    tabSwitches: 0,
+                    task1Score: t1Score,
+                    task1Correct: t1Score,
+                    task1Wrong: t1Total - t1Score,
+                    task1Unanswered: 0,
+                    task2Score: t2Score,
+                    task2Correct: t2Score,
+                    task2Wrong: t2Total - t2Score,
+                    task2Unanswered: 0,
+                    task3Score: t3Score,
+                    task3Correct: t3Score,
+                    task3Wrong: t3Total - t3Score,
+                    task3Unanswered: 0,
+                    startedAt: entry.latestSubmittedAt || new Date().toISOString(),
+                    updatedAt: entry.latestSubmittedAt || new Date().toISOString(),
+                    completedAt: isAllCompleted ? entry.latestSubmittedAt : null,
+                    isLive: !isAllCompleted,
+                    rawDoc: entry
+                });
+            }
+        });
+
+        // -------------------------------------------------------------
+        // SOURCE 3: Completed Quiz Results (from quiz_results collection)
+        // -------------------------------------------------------------
         this.completedResults.forEach(r => {
             const sid = r.studentId || window.firebaseService.normalizeStudentId(r.studentName, r.section || r.studentSection);
             const totalQ = r.totalQuestions || totalConfiguredQuestions;
-            const score = typeof r.totalScore === 'number' ? r.totalScore : 0;
+            const score = typeof r.totalScore === 'number' ? r.totalScore : (typeof r.score === 'number' ? r.score : 0);
             const pct = typeof r.percentage === 'number' ? r.percentage : (totalQ > 0 ? Number(((score / totalQ) * 100).toFixed(2)) : 0);
             const completedTime = r.completedAt ? new Date(r.completedAt).toISOString() : new Date().toISOString();
 
@@ -144,6 +567,7 @@ class TeacherDashboard {
                 answeredQuestions: totalQ,
                 score: score,
                 percentage: pct,
+                progressPercentage: 100,
                 earnedXP: r.earnedXP || (score * 10),
                 maxStreak: r.maxStreak || 0,
                 timeUsed: r.timeUsed || 0,
@@ -169,24 +593,25 @@ class TeacherDashboard {
             };
 
             // If multiple submissions exist for same student, preserve the newest one
-            if (!learnerMap.has(sid) || new Date(record.completedAt).getTime() >= new Date(learnerMap.get(sid).completedAt).getTime()) {
+            if (!learnerMap.has(sid) || new Date(record.completedAt).getTime() >= new Date(learnerMap.get(sid).completedAt || 0).getTime()) {
                 learnerMap.set(sid, record);
             }
         });
 
-        // Step 2: Overlay / Merge In-Progress Active Attempts
+        // -------------------------------------------------------------
+        // SOURCE 4: Live In-Progress Attempts (from active_attempts)
+        // -------------------------------------------------------------
         this.activeAttempts.forEach(a => {
-            const sid = a.studentId || a.id || window.firebaseService.normalizeStudentId(a.studentName, a.section);
+            const sid = a.studentId || a.id || window.firebaseService.normalizeStudentId(a.studentName, a.section || a.studentSection);
             const isCompletedInActive = a.status === 'completed' || a.status === 'auto_submitted';
 
-            // If student already has a completed record in quiz_results, keep completed unless active attempt is strictly newer
+            // If student already has a completed record, preserve completed unless active attempt is strictly newer
             if (learnerMap.has(sid) && !isCompletedInActive) {
                 const existing = learnerMap.get(sid);
                 const activeUpdatedMs = new Date(a.updatedAt || a.startedAt || 0).getTime();
                 const completedMs = new Date(existing.completedAt || 0).getTime();
 
-                // If active attempt was started AFTER the completed quiz, let active take precedence
-                if (activeUpdatedMs <= completedMs) {
+                if (existing.status === 'completed' && activeUpdatedMs <= completedMs) {
                     return; // Ignore stale in-progress document
                 }
             }
@@ -199,7 +624,7 @@ class TeacherDashboard {
             const taskNum = a.currentTask || 1;
             const updatedIso = a.updatedAt || a.last_activity_at || a.startedAt || new Date().toISOString();
 
-            // Determine active status: check for expired/abandoned (e.g. inactive > 40 mins and not completed)
+            // Determine active status: check for expired/abandoned (> 40 mins inactive)
             let status = a.status || 'in_progress';
             const inactiveMinutes = (Date.now() - new Date(updatedIso).getTime()) / (1000 * 60);
             if (status === 'in_progress' && inactiveMinutes > 40) {

@@ -130,13 +130,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Register student active session in Firebase (for teacher visibility)
                 if (window.firebaseService && typeof window.firebaseService.registerStudentSession === 'function') {
-                    window.firebaseService.registerStudentSession({
-                        studentId: currentStudentId,
-                        studentName: currentStudentName,
-                        studentSection: currentStudentSection,
-                        status: 'online',
-                        lastActive: new Date().toISOString()
-                    }).catch(() => {});
+                 window.firebaseService.registerStudentSession({
+    studentId: currentStudentId,
+    studentName: currentStudentName,
+    studentSection: currentStudentSection,
+    status: 'online',
+    lastActive: new Date().toISOString()
+})
+.then(() => {
+    console.info('[Student] ✅ Active student successfully saved to Firestore:', currentStudentId);
+})
+.catch((err) => {
+    console.error('[Student] ❌ Failed to save active student to Firestore:', err);
+});
                 }
 
                 // Show briefing screen immediately

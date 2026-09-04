@@ -8,6 +8,7 @@
 const firebaseConfig = {
     apiKey: "AIzaSyAwdV8U4uZ0yBKbWFld3bV-zR1gKnX6EZI",
     authDomain: "questionandanswer-1d20f.firebaseapp.com",
+     databaseURL: "https://questionandanswer-1d20f-default-rtdb.firebaseio.com",
     projectId: "questionandanswer-1d20f",
     storageBucket: "questionandanswer-1d20f.firebasestorage.app",
     messagingSenderId: "67343470260",
@@ -606,7 +607,7 @@ class FirebaseService {
     listenToQuizResults(onUpdate, onError) {
         if (this.initialized && this.db) {
             try {
-                return this.db.collection('quiz_results').orderBy('completedAt', 'desc').onSnapshot((snapshot) => {
+                return this.db.collection('quiz_results').onSnapshot((snapshot) => {
                     const results = [];
                     snapshot.forEach(doc => {
                         const d = doc.data();
@@ -639,12 +640,81 @@ class FirebaseService {
     }
 
     /**
+     * Real-time Firestore Listener for Task-Level Submissions (Tasks 1, 2, 3).
+     */
+    listenToSubmissions(onUpdate, onError) {
+        if (this.initialized && this.db) {
+            try {
+                return this.db.collection('submissions').onSnapshot((snapshot) => {
+                    const submissions = [];
+                    snapshot.forEach(doc => {
+                        const d = doc.data();
+                        let dateStr = new Date().toISOString();
+                        if (d.submittedAt && d.submittedAt.toDate) {
+                            dateStr = d.submittedAt.toDate().toISOString();
+                        } else if (typeof d.submittedAt === 'string') {
+                            dateStr = d.submittedAt;
+                        }
+                        submissions.push({
+                            id: doc.id,
+                            ...d,
+                            submittedAt: dateStr
+                        });
+                    });
+                    if (typeof onUpdate === 'function') {
+                        onUpdate(submissions);
+                    }
+                }, (err) => {
+                    console.warn('[FirebaseService] submissions snapshot warning:', err.message);
+                    if (typeof onError === 'function') onError(err);
+                });
+            } catch (err) {
+                console.error('[FirebaseService] Error setting up submissions snapshot listener:', err);
+                if (typeof onError === 'function') onError(err);
+                return () => {};
+            }
+        }
+        return () => {};
+    }
+
+    /**
+     * Real-time Firestore Listener for Registered Active Students.
+     */
+    listenToActiveStudents(onUpdate, onError) {
+        if (this.initialized && this.db) {
+            try {
+                return this.db.collection('active_students').onSnapshot((snapshot) => {
+                    const students = [];
+                    snapshot.forEach(doc => {
+                        const d = doc.data();
+                        students.push({
+                            id: doc.id,
+                            ...d
+                        });
+                    });
+                    if (typeof onUpdate === 'function') {
+                        onUpdate(students);
+                    }
+                }, (err) => {
+                    console.warn('[FirebaseService] active_students snapshot warning:', err.message);
+                    if (typeof onError === 'function') onError(err);
+                });
+            } catch (err) {
+                console.error('[FirebaseService] Error setting up active_students snapshot listener:', err);
+                if (typeof onError === 'function') onError(err);
+                return () => {};
+            }
+        }
+        return () => {};
+    }
+
+    /**
      * Retrieve all student quiz results for Teacher Dashboard from Firestore.
      */
     async getAllResults() {
         if (this.initialized && this.db) {
             try {
-                const fetchPromise = this.db.collection('quiz_results').orderBy('completedAt', 'desc').get();
+                const fetchPromise = this.db.collection('quiz_results').get();
                 const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
                 const snapshot = await Promise.race([fetchPromise, timeoutPromise]);
 
@@ -670,6 +740,39 @@ class FirebaseService {
         }
 
         return JSON.parse(localStorage.getItem('english10_quiz_submissions') || '[]');
+    }
+
+    /**
+     * Retrieve all task submissions from Firestore.
+     */
+    async getAllSubmissions() {
+        if (this.initialized && this.db) {
+            try {
+                const fetchPromise = this.db.collection('submissions').get();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
+                const snapshot = await Promise.race([fetchPromise, timeoutPromise]);
+
+                const list = [];
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    let dateStr = new Date().toISOString();
+                    if (d.submittedAt && d.submittedAt.toDate) {
+                        dateStr = d.submittedAt.toDate().toISOString();
+                    } else if (typeof d.submittedAt === 'string') {
+                        dateStr = d.submittedAt;
+                    }
+                    list.push({
+                        id: doc.id,
+                        ...d,
+                        submittedAt: dateStr
+                    });
+                });
+                return list;
+            } catch (err) {
+                // Silently fallback
+            }
+        }
+        return [];
     }
 
     /**
